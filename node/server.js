@@ -5,11 +5,11 @@ const path = require("path");
 const fs = require("fs").promises;
 
 const app = express();
-const PORT = 5001;
+const PORT = 5000;
 
 // CONFIGURATIE VARIABELEN - PAS HIER AAN
 const CONFIG = {
-    drawingDate: "2025-11-07T00:00:00", // Datum vanaf wanneer lootjes trekken mogelijk is
+    drawingDate: "2025-10-07T00:00:00", // Datum vanaf wanneer lootjes trekken mogelijk is
     minParticipants: 2, // Minimum aantal deelnemers voordat lootjes trekken mogelijk is
     allowMultipleDraws: false, // Of iemand meerdere keren mag trekken
 };
@@ -284,6 +284,46 @@ app.post("/api/draw", async (req, res) => {
     await saveDraws();
 
     res.json({ drawn });
+});
+
+// Admin endpoints
+app.get("/api/admin/users", (req, res) => {
+    const userList = users.map(u => ({ username: u.username }));
+    res.json(userList);
+});
+
+app.post("/api/admin/delete-user", async (req, res) => {
+    const { username } = req.body;
+
+    if (!username) {
+        return res.status(400).json({ error: "Gebruikersnaam is verplicht" });
+    }
+
+    const userIndex = users.findIndex(u => u.username === username);
+    
+    if (userIndex === -1) {
+        return res.status(404).json({ error: "Gebruiker niet gevonden" });
+    }
+
+    // Remove user
+    users.splice(userIndex, 1);
+    
+    // Remove from draws if present
+    if (draws[username]) {
+        delete draws[username];
+    }
+    
+    // Remove if someone drew this user
+    for (const [drawer, drawn] of Object.entries(draws)) {
+        if (drawn === username) {
+            delete draws[drawer];
+        }
+    }
+
+    await saveUsers();
+    await saveDraws();
+
+    res.json({ success: true });
 });
 
 app.listen(PORT, "0.0.0.0", async () => {

@@ -104,17 +104,22 @@ class App {
                 return;
             }
 
-            const wheel = document.getElementById("wheel");
+            const wheel = document.querySelector("#wheel svg");
             const randomSpins = 5 + Math.random() * 3;
-            const targetIndex = this.participants.findIndex(
+            const wheelParticipants = this.participants.filter(
+                (p) => p.username !== this.currentUser.username,
+            );
+            const targetIndex = wheelParticipants.findIndex(
                 (p) => p.username === data.drawn,
             );
-            const degreesPerSegment = 360 / this.participants.length;
+            const degreesPerSegment = 360 / wheelParticipants.length;
             const targetDegrees =
                 360 - targetIndex * degreesPerSegment - degreesPerSegment / 2;
             const totalRotation = randomSpins * 360 + targetDegrees;
 
-            wheel.style.transform = `rotate(${totalRotation}deg)`;
+            if (wheel) {
+                wheel.style.transform = `rotate(${totalRotation}deg)`;
+            }
 
             setTimeout(() => {
                 document.getElementById("result").innerHTML =
@@ -129,70 +134,144 @@ class App {
         }
     }
 
-    renderLoginPage() {
+    renderAuthPage(isLogin = true) {
         return `
-            <div class="container">
-                <h1>👞 Familie Veldhuizen Sinterklaas 🎁</h1>
-                <h2>Login</h2>
-                <div class="login-wrapper">
+            <div class="container auth-page">
+                <h1>👞 Familie Veldhuizen<br>Sinterklaas 🎁</h1>
+                
+                <div class="auth-tabs">
+                    <button class="auth-tab ${isLogin ? "active" : ""}" id="tab-login">
+                        🔑 Inloggen
+                    </button>
+                    <button class="auth-tab ${!isLogin ? "active" : ""}" id="tab-register">
+                        ✨ Registreren
+                    </button>
+                </div>
+
+                <div class="auth-wrapper">
                     <div class="decorative-wheel">
+                        <div class="decorative-icon">🎅</div>
                         <div class="decorative-icon">🎁</div>
-                        <div class="decorative-icon">🍫</div>
                         <div class="decorative-icon">👞</div>
-                        <div class="decorative-icon">🍬</div>
+                        <div class="decorative-icon">🍫</div>
                     </div>
-                    <div class="login-form-container">
-                        <form id="login-form">
+                    
+                    <div class="auth-form-container">
+                        <form id="auth-form">
                             <div class="form-group">
                                 <label>Gebruikersnaam</label>
-                                <input type="text" id="login-username" required>
+                                <input type="text" id="auth-username" required placeholder="${isLogin ? "" : "Jouw naam"}">
                             </div>
                             <div class="form-group">
                                 <label>Wachtwoord</label>
-                                <input type="password" id="login-password" required>
+                                <input type="password" id="auth-password" required placeholder="${isLogin ? "" : "Minimaal 4 tekens"}">
                             </div>
-                            <button type="submit">Inloggen 🎅</button>
+                            <button type="submit" class="auth-submit-btn">
+                                ${isLogin ? "Inloggen 🎅" : "Account Aanmaken 🎁"}
+                            </button>
                         </form>
-                        <div class="link-text">
-                            Nog geen account? <a href="#" id="show-register">Registreer hier</a>
-                        </div>
                     </div>
+                </div>
+                
+                <div class="footer-credits">
+                    Gemaakt door <a href="https://semhekman.nl" target="_blank">Sem Hekman</a> 💻
                 </div>
             </div>
         `;
     }
 
+    renderLoginPage() {
+        return this.renderAuthPage(true);
+    }
+
     renderRegisterPage() {
+        return this.renderAuthPage(false);
+    }
+
+    renderAdminPage() {
         return `
-            <div class="container">
-                <h1>🎅 Familie Veldhuizen Sinterklaas 🎁</h1>
-                <h2>Registreren</h2>
-                <div class="login-wrapper">
-                    <div class="decorative-wheel">
-                        <div class="decorative-icon">🎁</div>
-                        <div class="decorative-icon">🍫</div>
-                        <div class="decorative-icon">👞</div>
-                        <div class="decorative-icon">🍬</div>
-                    </div>
-                    <div class="login-form-container">
-                        <form id="register-form">
-                            <div class="form-group">
-                                <label>Gebruikersnaam</label>
-                                <input type="text" id="register-username" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Wachtwoord</label>
-                                <input type="password" id="register-password" required>
-                            </div>
-                            <button type="submit">Registreer 🎁</button>
-                        </form>
-                        <div class="link-text">
-                            Al een account? <a href="#" id="show-login">Login hier</a>
-                        </div>
-                    </div>
+            <div class="container admin-page">
+                <h1>🔧 Admin Paneel</h1>
+                <h2>Gebruikersbeheer</h2>
+                <div id="admin-message"></div>
+                <div class="users-admin-list" id="users-admin-list">
+                    <p style="text-align: center; color: #666;">Laden...</p>
+                </div>
+                <button class="logout-btn" id="admin-logout-btn">Terug naar app 🚪</button>
+                
+                <div class="footer-credits">
+                    Gemaakt door <a href="https://semhekman.nl" target="_blank">Sem Hekman</a> 💻
                 </div>
             </div>
         `;
+    }
+
+    async loadUsersForAdmin() {
+        try {
+            const response = await fetch("/api/admin/users");
+            if (response.ok) {
+                const users = await response.json();
+                const adminList = document.getElementById("users-admin-list");
+
+                if (users.length === 0) {
+                    adminList.innerHTML =
+                        '<p style="text-align: center; color: #666;">Geen gebruikers gevonden</p>';
+                    return;
+                }
+
+                adminList.innerHTML = users
+                    .map(
+                        (user) => `
+                    <div class="admin-user-card">
+                        <div class="admin-user-info">
+                            <strong>${user.username}</strong>
+                        </div>
+                        <button class="delete-user-btn" onclick="app.deleteUser('${user.username}')">
+                            🗑️ Verwijderen
+                        </button>
+                    </div>
+                `,
+                    )
+                    .join("");
+            } else {
+                document.getElementById("users-admin-list").innerHTML =
+                    '<p style="text-align: center; color: #c41e3a;">Geen toegang tot admin paneel</p>';
+            }
+        } catch (error) {
+            console.error("Failed to load users:", error);
+        }
+    }
+
+    async deleteUser(username) {
+        if (
+            !confirm(
+                `Weet je zeker dat je gebruiker "${username}" wilt verwijderen?`,
+            )
+        ) {
+            return;
+        }
+
+        try {
+            const response = await fetch("/api/admin/delete-user", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username }),
+            });
+
+            if (response.ok) {
+                document.getElementById("admin-message").innerHTML =
+                    '<div class="success-message">✅ Gebruiker verwijderd!</div>';
+                setTimeout(() => {
+                    document.getElementById("admin-message").innerHTML = "";
+                }, 3000);
+                await this.loadUsersForAdmin();
+            } else {
+                const error = await response.json();
+                alert(error.error || "Verwijderen mislukt");
+            }
+        } catch (error) {
+            alert("Verwijderen mislukt: " + error.message);
+        }
     }
 
     async loadMyDraw() {
@@ -220,56 +299,86 @@ class App {
             "#FCBAD3",
             "#A8E6CF",
         ];
-        const degreesPerSegment =
-            this.participants.length > 0 ? 360 / this.participants.length : 0;
 
-        const segments =
-            this.participants.length > 0
-                ? this.participants
-                      .map((participant, index) => {
-                          const rotation = index * degreesPerSegment;
-                          const color = colors[index % colors.length];
-                          const labelRotation =
-                              rotation + degreesPerSegment / 2;
-                          const radius = 120;
-                          const x =
-                              Math.cos(((labelRotation - 90) * Math.PI) / 180) *
-                              radius;
-                          const y =
-                              Math.sin(((labelRotation - 90) * Math.PI) / 180) *
-                              radius;
+        let segments = "";
 
-                          return `
-                <div class="wheel-segment" style="
-                    background: ${color};
-                    transform: rotate(${rotation}deg) skewY(${-90 + degreesPerSegment}deg);
-                    clip-path: polygon(0 0, 100% 0, 100% 100%);
-                    border-right: 3px solid white;
-                    box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
-                ">
-                </div>
-                <div style="
-                    position: absolute;
-                    left: 50%;
-                    top: 50%;
-                    transform: translate(-50%, -50%) translate(${x}px, ${y}px);
-                    font-weight: bold;
-                    color: white;
-                    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
-                    font-size: 15px;
-                    pointer-events: none;
-                    z-index: 10;
-                    white-space: nowrap;
-                    background: rgba(0, 0, 0, 0.3);
-                    padding: 4px 8px;
-                    border-radius: 5px;
-                ">
-                    ${participant.username}
-                </div>
+        // Filter out current user from wheel participants
+        const wheelParticipants = this.participants.filter(
+            (p) => p.username !== this.currentUser.username,
+        );
+
+        if (wheelParticipants.length > 0) {
+            const numSegments = wheelParticipants.length;
+            const anglePerSegment = 360 / numSegments;
+
+            // Create SVG segments
+            let svgPaths = "";
+            for (let i = 0; i < numSegments; i++) {
+                const startAngle = i * anglePerSegment;
+                const endAngle = (i + 1) * anglePerSegment;
+                const color = colors[i % colors.length];
+
+                // Convert angles to radians
+                const startRad = ((startAngle - 90) * Math.PI) / 180;
+                const endRad = ((endAngle - 90) * Math.PI) / 180;
+
+                // Calculate path points (radius = 150)
+                const x1 = 150 + 150 * Math.cos(startRad);
+                const y1 = 150 + 150 * Math.sin(startRad);
+                const x2 = 150 + 150 * Math.cos(endRad);
+                const y2 = 150 + 150 * Math.sin(endRad);
+
+                const largeArc = anglePerSegment > 180 ? 1 : 0;
+
+                svgPaths += `
+                    <path d="M 150,150 L ${x1},${y1} A 150,150 0 ${largeArc},1 ${x2},${y2} Z" 
+                          fill="${color}" 
+                          stroke="white" 
+                          stroke-width="3"/>
+                `;
+            }
+
+            // Create labels
+            let labels = "";
+            for (let i = 0; i < numSegments; i++) {
+                const angle = i * anglePerSegment + anglePerSegment / 2;
+                const angleRad = ((angle - 90) * Math.PI) / 180;
+                const radius = 85; // Moved closer to center
+                const x = 150 + radius * Math.cos(angleRad);
+                const y = 150 + radius * Math.sin(angleRad);
+
+                // Truncate long names
+                const username = wheelParticipants[i].username;
+                const displayName =
+                    username.length > 10
+                        ? username.substring(0, 8) + ".."
+                        : username;
+
+                labels += `
+                    <text x="${x}" y="${y}" 
+                          text-anchor="middle" 
+                          dominant-baseline="middle"
+                          fill="white" 
+                          font-weight="bold" 
+                          font-size="13"
+                          style="text-shadow: 2px 2px 4px rgba(0,0,0,0.8); pointer-events: none;">
+                        ${displayName}
+                    </text>
+                `;
+            }
+
+            segments = `
+                <svg width="300" height="300" viewBox="0 0 300 300" style="transform: rotate(0deg); transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);">
+                    ${svgPaths}
+                    ${labels}
+                    <circle cx="150" cy="150" r="20" fill="#333" stroke="white" stroke-width="4"/>
+                    <circle cx="150" cy="150" r="12" fill="white"/>
+                </svg>
             `;
-                      })
-                      .join("")
-                : '<div style="text-align: center; padding: 50px;">Geen deelnemers gevonden</div>';
+        } else {
+            segments =
+                '<div style="text-align: center; padding: 50px;">Geen deelnemers gevonden</div>';
+        }
 
         return `
             <div class="container">
@@ -302,6 +411,10 @@ class App {
                         </div>
                         <div class="info-text">
                             🎅 Trek je lootje en ontdek wie je gaat verrassen! 🎁
+                        </div>
+                        <div class="wheel-notice">
+                            ℹ️ Let op: Het rad kan soms een verkeerde naam tonen tijdens het draaien.<br>
+                            De <strong>juiste naam</strong> verschijnt altijd hieronder na het trekken! ⬇️
                         </div>
                         <button id="spin-btn">Trek een lootje! 🎅</button>
                         <div id="result"></div>
@@ -343,6 +456,10 @@ class App {
                 </div>
 
                 <button class="logout-btn" id="logout-btn">Uitloggen 🚪</button>
+                
+                <div class="footer-credits">
+                    Gemaakt door <a href="https://semhekman.nl" target="_blank">Sem Hekman</a> 💻
+                </div>
             </div>
         `;
     }
@@ -400,52 +517,71 @@ class App {
     switchTab(tabName) {
         this.currentTab = tabName;
         this.render();
+
+        // Reset wheel rotation when switching to wheel tab
+        if (tabName === "wheel") {
+            setTimeout(() => {
+                const wheel = document.querySelector("#wheel svg");
+                if (wheel && !wheel.style.transform.includes("rotate")) {
+                    wheel.style.transform = "rotate(0deg)";
+                }
+            }, 50);
+        }
     }
 
     async render() {
         const app = document.getElementById("app");
 
-        if (!this.currentUser) {
-            app.innerHTML = this.renderLoginPage();
+        // Check for admin page via hash
+        if (window.location.hash === "#admin") {
+            app.innerHTML = this.renderAdminPage();
+            await this.loadUsersForAdmin();
 
             document
-                .getElementById("login-form")
+                .getElementById("admin-logout-btn")
+                .addEventListener("click", () => {
+                    window.location.hash = "";
+                    this.render();
+                });
+            return;
+        }
+
+        if (!this.currentUser) {
+            const isLogin = !window.location.hash.includes("register");
+            app.innerHTML = this.renderAuthPage(isLogin);
+
+            document
+                .getElementById("auth-form")
                 .addEventListener("submit", (e) => {
                     e.preventDefault();
                     const username =
-                        document.getElementById("login-username").value;
+                        document.getElementById("auth-username").value;
                     const password =
-                        document.getElementById("login-password").value;
-                    this.login(username, password);
+                        document.getElementById("auth-password").value;
+
+                    const currentTab =
+                        document.querySelector(".auth-tab.active");
+                    const isLoginTab = currentTab.id === "tab-login";
+
+                    if (isLoginTab) {
+                        this.login(username, password);
+                    } else {
+                        this.register(username, password);
+                    }
                 });
 
             document
-                .getElementById("show-register")
-                .addEventListener("click", (e) => {
-                    e.preventDefault();
-                    app.innerHTML = this.renderRegisterPage();
+                .getElementById("tab-login")
+                .addEventListener("click", () => {
+                    window.location.hash = "";
+                    this.render();
+                });
 
-                    document
-                        .getElementById("register-form")
-                        .addEventListener("submit", (e) => {
-                            e.preventDefault();
-                            const username =
-                                document.getElementById(
-                                    "register-username",
-                                ).value;
-                            const password =
-                                document.getElementById(
-                                    "register-password",
-                                ).value;
-                            this.register(username, password);
-                        });
-
-                    document
-                        .getElementById("show-login")
-                        .addEventListener("click", (e) => {
-                            e.preventDefault();
-                            this.render();
-                        });
+            document
+                .getElementById("tab-register")
+                .addEventListener("click", () => {
+                    window.location.hash = "register";
+                    this.render();
                 });
         } else {
             app.innerHTML = await this.renderHomePage();
@@ -482,14 +618,18 @@ class App {
             // Load my draw if on that tab
             if (this.currentTab === "mydraw") {
                 const myDraw = await this.loadMyDraw();
-                const myDrawContent = document.getElementById("my-draw-content");
-                
+                const myDrawContent =
+                    document.getElementById("my-draw-content");
+
                 if (myDraw && myDraw.drawn) {
                     const wishlistItems = myDraw.wishlist
                         ? myDraw.wishlist
                               .split("\n")
                               .filter((i) => i.trim())
-                              .map((item) => `<div class="wishlist-item">🎁 ${item}</div>`)
+                              .map(
+                                  (item) =>
+                                      `<div class="wishlist-item">🎁 ${item}</div>`,
+                              )
                               .join("")
                         : '<p style="color: #666;">Nog geen verlanglijstje ingevuld</p>';
 
@@ -497,7 +637,10 @@ class App {
                         ? myDraw.hobbies
                               .split("\n")
                               .filter((i) => i.trim())
-                              .map((item) => `<div class="wishlist-item">⭐ ${item}</div>`)
+                              .map(
+                                  (item) =>
+                                      `<div class="wishlist-item">⭐ ${item}</div>`,
+                              )
                               .join("")
                         : '<p style="color: #666;">Nog geen hobby\'s ingevuld</p>';
 

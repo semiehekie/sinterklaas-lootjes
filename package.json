@@ -3,9 +3,9 @@
   "name": "familie-veldhuizen-lootjes",
   "version": "1.0.0",
   "description": "Lootjes trekken voor de familie Veldhuizen",
-  "main": "server.js",
+  "main": "node/server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node node/server.js"
   },
   "dependencies": {
     "express": "^4.18.2",
