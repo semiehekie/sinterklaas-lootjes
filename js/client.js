@@ -390,7 +390,7 @@ class App {
                         🎡 Lootjes Trekken
                     </button>
                     <button class="nav-tab ${this.currentTab === "mydraw" ? "active" : ""}" data-tab="mydraw">
-                        🎁 Mijn Lootje
+                        🎁 Mijn Getrokken Lootje
                     </button>
                     <button class="nav-tab ${this.currentTab === "profile" ? "active" : ""}" data-tab="profile">
                         📝 Mijn Profiel
