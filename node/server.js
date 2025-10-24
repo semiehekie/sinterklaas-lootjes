@@ -5,12 +5,12 @@ const path = require("path");
 const fs = require("fs").promises;
 
 const app = express();
-const PORT = 5000;
+const PORT = 5001;
 
 // CONFIGURATIE VARIABELEN - PAS HIER AAN
 const CONFIG = {
-    drawingDate: "2025-10-05T00:00:00", // Datum vanaf wanneer lootjes trekken mogelijk is
-    minParticipants: 3, // Minimum aantal deelnemers voordat lootjes trekken mogelijk is
+    drawingDate: "2024-01-01T00:00:00", // Datum vanaf wanneer lootjes trekken mogelijk is
+    minParticipants: 2, // Minimum aantal deelnemers voordat lootjes trekken mogelijk is
     allowMultipleDraws: false, // Of iemand meerdere keren mag trekken
 };
 
@@ -217,6 +217,26 @@ app.post("/api/profile", async (req, res) => {
         username: user.username,
         wishlist: user.wishlist,
         hobbies: user.hobbies,
+    });
+});
+
+app.get("/api/my-draw", (req, res) => {
+    if (!req.session.username) {
+        return res.status(401).json({ error: "Niet ingelogd" });
+    }
+
+    const drawnPerson = draws[req.session.username];
+    
+    if (!drawnPerson) {
+        return res.json({ drawn: null });
+    }
+
+    const drawnUser = users.find((u) => u.username === drawnPerson);
+    
+    res.json({
+        drawn: drawnPerson,
+        wishlist: drawnUser?.wishlist || "",
+        hobbies: drawnUser?.hobbies || "",
     });
 });
 

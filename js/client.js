@@ -195,6 +195,18 @@ class App {
         `;
     }
 
+    async loadMyDraw() {
+        try {
+            const response = await fetch("/api/my-draw");
+            if (response.ok) {
+                return await response.json();
+            }
+        } catch (error) {
+            console.error("Failed to load draw:", error);
+        }
+        return null;
+    }
+
     async renderHomePage() {
         await this.loadParticipants();
 
@@ -268,6 +280,9 @@ class App {
                     <button class="nav-tab ${this.currentTab === "wheel" ? "active" : ""}" data-tab="wheel">
                         🎡 Lootjes Trekken
                     </button>
+                    <button class="nav-tab ${this.currentTab === "mydraw" ? "active" : ""}" data-tab="mydraw">
+                        🎁 Mijn Lootje
+                    </button>
                     <button class="nav-tab ${this.currentTab === "profile" ? "active" : ""}" data-tab="profile">
                         📝 Mijn Profiel
                     </button>
@@ -286,10 +301,19 @@ class App {
                             </div>
                         </div>
                         <div class="info-text">
-                            🎅 Lootjes trekken is mogelijk vanaf 5 november 2025 🎁
+                            🎅 Trek je lootje en ontdek wie je gaat verrassen! 🎁
                         </div>
                         <button id="spin-btn">Trek een lootje! 🎅</button>
                         <div id="result"></div>
+                    </div>
+                </div>
+
+                <div class="tab-content ${this.currentTab === "mydraw" ? "active" : ""}" id="mydraw-tab">
+                    <div class="profile-section">
+                        <h2>🎁 Mijn Getrokken Lootje</h2>
+                        <div id="my-draw-content">
+                            <p style="text-align: center; color: #666;">Laden...</p>
+                        </div>
                     </div>
                 </div>
 
@@ -454,6 +478,49 @@ class App {
                 .addEventListener("click", () => {
                     this.logout();
                 });
+
+            // Load my draw if on that tab
+            if (this.currentTab === "mydraw") {
+                const myDraw = await this.loadMyDraw();
+                const myDrawContent = document.getElementById("my-draw-content");
+                
+                if (myDraw && myDraw.drawn) {
+                    const wishlistItems = myDraw.wishlist
+                        ? myDraw.wishlist
+                              .split("\n")
+                              .filter((i) => i.trim())
+                              .map((item) => `<div class="wishlist-item">🎁 ${item}</div>`)
+                              .join("")
+                        : '<p style="color: #666;">Nog geen verlanglijstje ingevuld</p>';
+
+                    const hobbiesText = myDraw.hobbies
+                        ? myDraw.hobbies
+                              .split("\n")
+                              .filter((i) => i.trim())
+                              .map((item) => `<div class="wishlist-item">⭐ ${item}</div>`)
+                              .join("")
+                        : '<p style="color: #666;">Nog geen hobby\'s ingevuld</p>';
+
+                    myDrawContent.innerHTML = `
+                        <div style="text-align: center; margin-bottom: 30px;">
+                            <h3 style="font-size: 28px; color: #4CAF50;">
+                                Je hebt <strong>${myDraw.drawn}</strong> getrokken! 🎅
+                            </h3>
+                        </div>
+                        <h3 style="margin-top: 20px; margin-bottom: 10px;">🎁 Verlanglijstje:</h3>
+                        ${wishlistItems}
+                        <h3 style="margin-top: 20px; margin-bottom: 10px;">⭐ Hobby's & Interesses:</h3>
+                        ${hobbiesText}
+                    `;
+                } else {
+                    myDrawContent.innerHTML = `
+                        <p style="text-align: center; color: #666; font-size: 18px;">
+                            Je hebt nog geen lootje getrokken! 🎡<br><br>
+                            Ga naar "Lootjes Trekken" om een naam te trekken.
+                        </p>
+                    `;
+                }
+            }
         }
     }
 }
