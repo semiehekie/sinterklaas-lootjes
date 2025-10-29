@@ -138,7 +138,7 @@ class App {
         return `
             <div class="container auth-page">
                 <h1>👞 Familie Veldhuizen<br>Sinterklaas 🎁</h1>
-                
+                <h1>Deze Site Werkt Het Best Op Pc!</h1>
                 <div class="auth-tabs">
                     <button class="auth-tab ${isLogin ? "active" : ""}" id="tab-login">
                         🔑 Inloggen
