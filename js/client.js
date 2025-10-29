@@ -138,6 +138,18 @@ class App {
         return `
             <div class="container auth-page">
                 <h1>👞 Familie Veldhuizen<br>Sinterklaas 🎁</h1>
+                <div class="alert-banner">
+                ⚠️ <strong>Belangrijke mededeling:</strong><br>
+                Door een storing bij een externe partij zijn sommige accounts verloren gegaan.  
+                <br><br>
+                ➤ <strong>Er is géén informatie gelekt</strong> en al je gegevens blijven volledig veilig.  
+                <br><br>
+                Heb je last van dit probleem? Maak dan even een nieuw account aan om verder te kunnen.  
+                <br><br>
+                We doen er alles aan om dit in de toekomst niet meer te laten gebeuren. 💪  
+                <br><br>
+                Bedankt voor je begrip en vertrouwen! ❤️
+            </div>
                 <h1>Deze Site Werkt Het Best Op Pc!</h1>
                 <div class="auth-tabs">
                     <button class="auth-tab ${isLogin ? "active" : ""}" id="tab-login">
