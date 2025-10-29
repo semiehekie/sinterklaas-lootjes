@@ -463,17 +463,6 @@ class App {
             </div>
         `;
     }
-// Voeg dit toe aan het einde van renderHomePage() of na app.render()
-const budgetDiv = document.createElement("div");
-budgetDiv.className = "user-budget";
-budgetDiv.style = "margin: 10px 0; font-weight: bold; color: #333;";
-budgetDiv.innerHTML = "💰 Budget per cadeau: €25";
-
-// Plaats het direct onder de welkomsboodschap
-const welcomeDiv = document.querySelector(".user-welcome");
-if (welcomeDiv) {
-    welcomeDiv.insertAdjacentElement("afterend", budgetDiv);
-}
 
     renderUsersList() {
         return this.participants
