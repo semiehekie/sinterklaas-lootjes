@@ -396,8 +396,11 @@ class App {
             <div class="container">
                 <h1>🎅 Sinterklaas Lootjes Trekken 🎁</h1>
                 <div class="user-welcome">Welkom, ${this.currentUser.username}! 👞</div>
-
+                <p>klik </p> <button class="nav-tab ${this.currentTab === "profile" ? "active" : ""}" data-tab="profile">
+                        Hier
+                    </button>
                 <div class="nav-tabs">
+                <p>om een verlanglijstje toe te voegen</p>
                     <button class="nav-tab ${this.currentTab === "wheel" ? "active" : ""}" data-tab="wheel">
                         🎡 Lootjes Trekken
                     </button>
