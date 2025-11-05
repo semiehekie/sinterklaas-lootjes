@@ -10,7 +10,7 @@ const PORT = 5000;
 
 // CONFIGURATIE VARIABELEN - PAS HIER AAN
 const CONFIG = {
-    drawingDate: "2025-10-07T00:00:00", // Datum vanaf wanneer lootjes trekken mogelijk is
+    drawingDate: "2025-11-07T00:00:00", // Datum vanaf wanneer lootjes trekken mogelijk is
     minParticipants: 2, // Minimum aantal deelnemers voordat lootjes trekken mogelijk is
     allowMultipleDraws: false, // Of iemand meerdere keren mag trekken
 };
