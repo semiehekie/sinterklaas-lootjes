@@ -1,11 +1,5 @@
 [
   {
-    "username": "sem",
-    "password": "$2b$10$Ii0PJ1/UK5cZgdhritkNauopYQn1PdDYV9zBV7ypHBtclTwD/Wh0q",
-    "wishlist": "",
-    "hobbies": ""
-  },
-  {
     "username": "Loessie",
     "password": "$2b$10$G/lhKmJHB5w2exZceuXuh.nJNISP3EeZStDa6CUx.HfIKPkZyd0ye",
     "wishlist": "Rituels geurkaars navulling, geur Sakura",
@@ -32,6 +26,12 @@
   {
     "username": "opaatje",
     "password": "$2b$10$QS3reNfpQTzp/MBM3yVX.eONd24aQ6l4oJNCBDIG4mM6TumdOtqAu",
+    "wishlist": "",
+    "hobbies": ""
+  },
+  {
+    "username": "sem",
+    "password": "$2b$10$l0Cvs860lWixgyDxdzh7xu7KLZHs8K9FBthNguzNlGFiYe1yV.qo.",
     "wishlist": "",
     "hobbies": ""
   }

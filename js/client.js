@@ -392,15 +392,29 @@ class App {
                 '<div style="text-align: center; padding: 50px;">Geen deelnemers gevonden</div>';
         }
 
+        // Check if user has filled in wishlist
+        const hasWishlist = this.currentUser.wishlist && this.currentUser.wishlist.trim();
+        const wishlistReminder = !hasWishlist ? `
+            <div class="wishlist-reminder">
+                <div class="reminder-icon">🎁</div>
+                <div class="reminder-content">
+                    <h3>Vergeet je verlanglijstje niet!</h3>
+                    <p>Help anderen jou te verrassen door je wensen te delen</p>
+                    <button class="reminder-button" data-tab="profile">
+                        📝 Verlanglijstje Invullen
+                    </button>
+                </div>
+            </div>
+        ` : '';
+
         return `
             <div class="container">
                 <h1>🎅 Sinterklaas Lootjes Trekken 🎁</h1>
                 <div class="user-welcome">Welkom, ${this.currentUser.username}! 👞</div>
-                <p>klik </p> <button class="nav-tab ${this.currentTab === "profile" ? "active" : ""}" data-tab="profile">
-                        Hier
-                    </button>
+                
+                ${wishlistReminder}
+                
                 <div class="nav-tabs">
-                <p>om een verlanglijstje toe te voegen</p>
                     <button class="nav-tab ${this.currentTab === "wheel" ? "active" : ""}" data-tab="wheel">
                         🎡 Lootjes Trekken
                     </button>
@@ -606,6 +620,14 @@ class App {
                     this.switchTab(e.target.dataset.tab);
                 });
             });
+            
+            // Add listener for reminder button if it exists
+            const reminderBtn = document.querySelector(".reminder-button");
+            if (reminderBtn) {
+                reminderBtn.addEventListener("click", (e) => {
+                    this.switchTab(e.target.dataset.tab);
+                });
+            }
 
             const spinBtn = document.getElementById("spin-btn");
             if (spinBtn) {

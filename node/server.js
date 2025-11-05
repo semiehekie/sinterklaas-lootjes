@@ -3,16 +3,45 @@ const session = require("express-session");
 const bcrypt = require("bcrypt");
 const path = require("path");
 const fs = require("fs").promises;
+const crypto = require("crypto");
 
 const app = express();
 const PORT = 5000;
 
 // CONFIGURATIE VARIABELEN - PAS HIER AAN
 const CONFIG = {
-    drawingDate: "2025-11-07T00:00:00", // Datum vanaf wanneer lootjes trekken mogelijk is
+    drawingDate: "2025-10-07T00:00:00", // Datum vanaf wanneer lootjes trekken mogelijk is
     minParticipants: 2, // Minimum aantal deelnemers voordat lootjes trekken mogelijk is
     allowMultipleDraws: false, // Of iemand meerdere keren mag trekken
 };
+
+// Encryption key - in productie zou je dit in een environment variable moeten zetten
+const ENCRYPTION_KEY = crypto.scryptSync(
+    "veldhuizen-draws-secret-2025",
+    "salt",
+    32,
+);
+const ALGORITHM = "aes-256-cbc";
+
+// Encrypt data
+function encrypt(text) {
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
+    let encrypted = cipher.update(text, "utf8", "hex");
+    encrypted += cipher.final("hex");
+    return iv.toString("hex") + ":" + encrypted;
+}
+
+// Decrypt data
+function decrypt(text) {
+    const parts = text.split(":");
+    const iv = Buffer.from(parts.shift(), "hex");
+    const encryptedText = parts.join(":");
+    const decipher = crypto.createDecipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
+    let decrypted = decipher.update(encryptedText, "hex", "utf8");
+    decrypted += decipher.final("utf8");
+    return decrypted;
+}
 
 // Data directory
 const DATA_DIR = path.join(__dirname, "..", "data");
@@ -58,7 +87,8 @@ async function saveUsers() {
 async function loadDraws() {
     try {
         const data = await fs.readFile(DRAWS_FILE, "utf8");
-        draws = JSON.parse(data);
+        const decrypted = decrypt(data);
+        draws = JSON.parse(decrypted);
     } catch (error) {
         if (error.code !== "ENOENT") {
             console.error("Error loading draws:", error);
@@ -70,7 +100,9 @@ async function loadDraws() {
 // Save draws to file
 async function saveDraws() {
     try {
-        await fs.writeFile(DRAWS_FILE, JSON.stringify(draws, null, 2));
+        const jsonData = JSON.stringify(draws, null, 2);
+        const encrypted = encrypt(jsonData);
+        await fs.writeFile(DRAWS_FILE, encrypted);
     } catch (error) {
         console.error("Error saving draws:", error);
     }
@@ -226,13 +258,13 @@ app.get("/api/my-draw", (req, res) => {
     }
 
     const drawnPerson = draws[req.session.username];
-    
+
     if (!drawnPerson) {
         return res.json({ drawn: null });
     }
 
     const drawnUser = users.find((u) => u.username === drawnPerson);
-    
+
     res.json({
         drawn: drawnPerson,
         wishlist: drawnUser?.wishlist || "",
@@ -270,11 +302,9 @@ app.post("/api/draw", async (req, res) => {
     const available = getAvailableParticipants(currentUser);
 
     if (available.length === 0) {
-        return res
-            .status(400)
-            .json({
-                error: "Er zijn geen beschikbare personen meer om te trekken!",
-            });
+        return res.status(400).json({
+            error: "Er zijn geen beschikbare personen meer om te trekken!",
+        });
     }
 
     const randomIndex = Math.floor(Math.random() * available.length);
@@ -288,7 +318,7 @@ app.post("/api/draw", async (req, res) => {
 
 // Admin endpoints
 app.get("/api/admin/users", (req, res) => {
-    const userList = users.map(u => ({ username: u.username }));
+    const userList = users.map((u) => ({ username: u.username }));
     res.json(userList);
 });
 
@@ -299,20 +329,20 @@ app.post("/api/admin/delete-user", async (req, res) => {
         return res.status(400).json({ error: "Gebruikersnaam is verplicht" });
     }
 
-    const userIndex = users.findIndex(u => u.username === username);
-    
+    const userIndex = users.findIndex((u) => u.username === username);
+
     if (userIndex === -1) {
         return res.status(404).json({ error: "Gebruiker niet gevonden" });
     }
 
     // Remove user
     users.splice(userIndex, 1);
-    
+
     // Remove from draws if present
     if (draws[username]) {
         delete draws[username];
     }
-    
+
     // Remove if someone drew this user
     for (const [drawer, drawn] of Object.entries(draws)) {
         if (drawn === username) {

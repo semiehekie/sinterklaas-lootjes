@@ -779,6 +779,94 @@ button:active {
     transform: translateY(0);
 }
 
+.wishlist-reminder {
+    background: linear-gradient(135deg, #fff9e6 0%, #ffe9b3 100%);
+    border: 3px solid #ffc107;
+    border-radius: 15px;
+    padding: 20px;
+    margin: 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+    animation: gentle-pulse 2s ease-in-out infinite;
+}
+
+@keyframes gentle-pulse {
+    0%, 100% { 
+        transform: scale(1);
+        box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+    }
+    50% { 
+        transform: scale(1.02);
+        box-shadow: 0 6px 20px rgba(255, 193, 7, 0.4);
+    }
+}
+
+.reminder-icon {
+    font-size: 60px;
+    flex-shrink: 0;
+}
+
+.reminder-content {
+    flex: 1;
+}
+
+.reminder-content h3 {
+    color: #c41e3a;
+    margin: 0 0 8px 0;
+    font-size: 22px;
+}
+
+.reminder-content p {
+    color: #666;
+    margin: 0 0 15px 0;
+    font-size: 16px;
+}
+
+.reminder-button {
+    background: linear-gradient(135deg, #c41e3a 0%, #8b1e3f 100%);
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+    width: 100%;
+    margin: 0;
+}
+
+.reminder-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(196, 30, 58, 0.4);
+}
+
+@media (min-width: 768px) {
+    .wishlist-reminder {
+        padding: 25px;
+    }
+    
+    .reminder-icon {
+        font-size: 80px;
+    }
+    
+    .reminder-content h3 {
+        font-size: 24px;
+    }
+    
+    .reminder-content p {
+        font-size: 16px;
+    }
+    
+    .reminder-button {
+        width: auto;
+        padding: 12px 25px;
+        font-size: 16px;
+    }
+}
+
 .footer-credits {
     text-align: center;
     margin-top: 30px;
