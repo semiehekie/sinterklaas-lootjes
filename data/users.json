@@ -33,11 +33,23 @@
     "username": "sem",
     "password": "$2b$10$l0Cvs860lWixgyDxdzh7xu7KLZHs8K9FBthNguzNlGFiYe1yV.qo.",
     "wishlist": "eSUN PLA Filament Wit\neSUN PLA Filament Blauw\nBouwplaat voor Ender 3 v3 SE",
-    "hobbies": "Computers\nTreinen\nAlles met een stekker\nniksen"
+    "hobbies": "Computers\nTreinen\nAlles met een stekker\nniksen\nProgrammeren "
   },
   {
     "username": "Bas",
     "password": "$2b$10$BPRwqZzR.Q4dp0Ewrk0KP.0Z9EJZkRteQBCRWU6tTjtqTWpH2VZG.",
+    "wishlist": "",
+    "hobbies": ""
+  },
+  {
+    "username": "Mark ",
+    "password": "$2b$10$cBs0/QuemTmloXpO3DLZYO.v1JwDhaW4/oK0uQSY19sbk5G3vg4Sa",
+    "wishlist": "Stripboek \nKetting lube \nSpannend boek(detective)\nThermo shirt\nIsostar ",
+    "hobbies": "Mtb-en\nKlussen "
+  },
+  {
+    "username": "Gerdien ",
+    "password": "$2b$10$/YFmU2viVbHS5adcqg8e0O.c3NtqAiC7bRcYdHpvIfUifwFgMRZBW",
     "wishlist": "",
     "hobbies": ""
   }
