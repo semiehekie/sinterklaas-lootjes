@@ -91,7 +91,7 @@ async function loadDraws() {
         draws = JSON.parse(decrypted);
     } catch (error) {
         if (error.code !== "ENOENT") {
-            console.error("Error loading draws:", error);
+            console.error("Error loading draws (file may be missing or encrypted):", error.message);
         }
         draws = {};
     }
@@ -194,7 +194,7 @@ app.post("/api/login", async (req, res) => {
 });
 
 app.post("/api/logout", (req, res) => {
-    req.session.destroy();
+    req.session.destroy(() => {});
     res.json({ success: true });
 });
 
@@ -344,8 +344,8 @@ app.post("/api/admin/delete-user", async (req, res) => {
     }
 
     // Remove if someone drew this user
-    for (const [drawer, drawn] of Object.entries(draws)) {
-        if (drawn === username) {
+    for (const [drawer, drawnUser] of Object.entries(draws)) {
+        if (drawnUser === username) {
             delete draws[drawer];
         }
     }
