@@ -93,6 +93,53 @@ class App {
         }
     }
 
+    showDrawModal() {
+        const hasProfile =
+            this.currentUser.wishlist &&
+            this.currentUser.wishlist.trim() &&
+            this.currentUser.hobbies &&
+            this.currentUser.hobbies.trim();
+        const modal = document.createElement("div");
+
+        modal.className = "draw-modal-overlay";
+        modal.innerHTML = hasProfile
+            ? `
+                <div class="draw-modal" role="dialog" aria-modal="true" aria-labelledby="draw-modal-title">
+                    <h2 id="draw-modal-title">Even opletten</h2>
+                    <p>De naam die tijdens het draaien op het rad staat, is niet altijd de naam die je echt hebt getrokken.</p>
+                    <p>Kijk na het draaien bij <strong>Mijn Getrokken Lootje</strong> voor het juiste resultaat.</p>
+                    <button type="button" class="draw-modal-ok">OK, draai het rad</button>
+                </div>
+            `
+            : `
+                <div class="draw-modal" role="dialog" aria-modal="true" aria-labelledby="draw-modal-title">
+                    <h2 id="draw-modal-title">Profiel eerst invullen</h2>
+                    <p>Vul eerst je verlanglijstje en hobby's in. Daarna kun je een lootje trekken.</p>
+                    <button type="button" class="draw-modal-profile">Ga naar profiel</button>
+                </div>
+            `;
+
+        document.body.appendChild(modal);
+
+        const closeModal = () => modal.remove();
+        const profileButton = modal.querySelector(".draw-modal-profile");
+        const okButton = modal.querySelector(".draw-modal-ok");
+
+        if (profileButton) {
+            profileButton.addEventListener("click", () => {
+                closeModal();
+                this.switchTab("profile");
+            });
+        }
+
+        if (okButton) {
+            okButton.addEventListener("click", () => {
+                closeModal();
+                this.spinWheel();
+            });
+        }
+    }
+
     async spinWheel() {
         try {
             const response = await fetch("/api/draw", { method: "POST" });
@@ -112,12 +159,19 @@ class App {
             const targetIndex = wheelParticipants.findIndex(
                 (p) => p.username === data.drawn,
             );
+
+            if (targetIndex === -1) {
+                document.getElementById("result").innerHTML =
+                    `<div class="error-message">${data.drawn} staat niet op het rad. Vernieuw de pagina en probeer opnieuw.</div>`;
+                return;
+            }
+
             const degreesPerSegment = 360 / wheelParticipants.length;
-            const targetDegrees =
-                360 - targetIndex * degreesPerSegment - degreesPerSegment / 2;
-            const totalRotation = randomSpins * 360 + targetDegrees;
+            const targetCenter = (targetIndex + 0.5) * degreesPerSegment;
+            const totalRotation = randomSpins * 360 - targetCenter;
 
             if (wheel) {
+                wheel.style.transformOrigin = "50% 50%";
                 wheel.style.transform = `rotate(${totalRotation}deg)`;
             }
 
@@ -138,18 +192,7 @@ class App {
         return `
             <div class="container auth-page">
                 <h1>👞 Familie Veldhuizen<br>Sinterklaas 🎁</h1>
-                <div class="alert-banner">
-                ⚠️ <strong>Belangrijke mededeling:</strong><br>
-                Door een storing bij een externe partij zijn sommige accounts verloren gegaan.  
-                <br><br>
-                ➤ <strong>Er is géén informatie gelekt</strong> en al je gegevens blijven volledig veilig.  
-                <br><br>
-                Heb je last van dit probleem? Maak dan even een nieuw account aan om verder te kunnen.  
-                <br><br>
-                We doen er alles aan om dit in de toekomst niet meer te laten gebeuren. 💪  
-                <br><br>
-                Bedankt voor je begrip en vertrouwen! ❤️
-            </div>
+                
                 <h1>Deze Site Werkt Het Best Op Pc!</h1>
                 <div class="auth-tabs">
                     <button class="auth-tab ${isLogin ? "active" : ""}" id="tab-login">
@@ -380,7 +423,7 @@ class App {
             }
 
             segments = `
-                <svg width="300" height="300" viewBox="0 0 300 300" style="transform: rotate(0deg); transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);">
+                <svg width="300" height="300" viewBox="0 0 300 300" style="transform: rotate(0deg); transform-origin: 50% 50%; transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);">
                     ${svgPaths}
                     ${labels}
                     <circle cx="150" cy="150" r="20" fill="#333" stroke="white" stroke-width="4"/>
@@ -632,7 +675,7 @@ class App {
             const spinBtn = document.getElementById("spin-btn");
             if (spinBtn) {
                 spinBtn.addEventListener("click", () => {
-                    this.spinWheel();
+                    this.showDrawModal();
                 });
             }
 
