@@ -3,6 +3,9 @@ class App {
         this.currentUser = null;
         this.participants = [];
         this.currentTab = "wheel";
+        this.authStep = "welcome";
+        this.authError = "";
+        this.onboarding = false;
         this.init();
     }
 
@@ -22,6 +25,12 @@ class App {
         }
     }
 
+    showAuthError(message) {
+        this.authError = message;
+        const errorElement = document.getElementById("auth-error");
+        if (errorElement) errorElement.textContent = message;
+    }
+
     async register(username, password) {
         try {
             const response = await fetch("/api/register", {
@@ -31,17 +40,17 @@ class App {
             });
 
             if (response.ok) {
-                await this.login(username, password);
+                await this.login(username, password, true);
             } else {
                 const error = await response.json();
-                alert(error.error || "Registratie mislukt");
+                this.showAuthError(error.error || "Registratie mislukt");
             }
         } catch (error) {
-            alert("Registratie mislukt: " + error.message);
+            this.showAuthError("Registratie mislukt: " + error.message);
         }
     }
 
-    async login(username, password) {
+    async login(username, password, isNewAccount = false) {
         try {
             const response = await fetch("/api/login", {
                 method: "POST",
@@ -51,13 +60,14 @@ class App {
 
             if (response.ok) {
                 this.currentUser = await response.json();
+                this.onboarding = isNewAccount || !this.currentUser.wishlist?.trim() || !this.currentUser.hobbies?.trim();
                 this.render();
             } else {
                 const error = await response.json();
-                alert(error.error || "Login mislukt");
+                this.showAuthError(error.error || "Login mislukt");
             }
         } catch (error) {
-            alert("Login mislukt: " + error.message);
+            this.showAuthError("Inloggen mislukt: " + error.message);
         }
     }
 
@@ -189,48 +199,104 @@ class App {
     }
 
     renderAuthPage(isLogin = true) {
-        return `
-            <div class="container auth-page">
-                <h1>👞 Familie Veldhuizen<br>Sinterklaas 🎁</h1>
-                
-                <h1>Deze Site Werkt Het Best Op Pc!</h1>
-                <div class="auth-tabs">
-                    <button class="auth-tab ${isLogin ? "active" : ""}" id="tab-login">
-                        🔑 Inloggen
-                    </button>
-                    <button class="auth-tab ${!isLogin ? "active" : ""}" id="tab-register">
-                        ✨ Registreren
-                    </button>
+        if (this.authStep === "welcome") {
+            return `
+                <div class="container invitation-page">
+                    <div class="invitation-icon" aria-hidden="true">🎁</div>
+                    <p class="invitation-kicker">Sinterklaas 2026</p>
+                    <h1>Hallo, u bent uitgenodigd voor lootjes trekken!</h1>
+                    <p class="invitation-intro">Leuk dat je meedoet. Kies hieronder wat bij jou past. We leggen alles stap voor stap uit.</p>
+                    <div class="draw-reminder gift-expectation" role="note">
+                        <strong>Wat doen we met Sinterklaas?</strong>
+                        <p>We maken <span class="geen-accent">geen</span> surprise. Het gaat om een gedichtje, een cadeautje en eventueel iets geks of grappigs.</p>
+                    </div>
+                    <div class="invitation-choices">
+                        <button type="button" class="invitation-choice" id="choose-login">
+                            <span>🔑 Ik heb al een account</span>
+                            <small>Log in met je bestaande gebruikersnaam en wachtwoord.</small>
+                        </button>
+                        <button type="button" class="invitation-choice" id="choose-register">
+                            <span>✨ Ik doe mee voor 2026</span>
+                            <small>Maak een account aan en vul daarna je verlanglijstje in.</small>
+                        </button>
+                    </div>
+                    <div class="footer-credits">Gemaakt door <a href="https://semhekman.nl" target="_blank" rel="noopener">Sem Hekman</a> 💻</div>
                 </div>
+            `;
+        }
 
-                <div class="auth-wrapper">
-                    <div class="decorative-wheel">
-                        <div class="decorative-icon">🎅</div>
-                        <div class="decorative-icon">🎁</div>
-                        <div class="decorative-icon">👞</div>
-                        <div class="decorative-icon">🍫</div>
-                    </div>
-                    
-                    <div class="auth-form-container">
-                        <form id="auth-form">
-                            <div class="form-group">
-                                <label>Gebruikersnaam</label>
-                                <input type="text" id="auth-username" required placeholder="${isLogin ? "" : "Jouw naam"}">
-                            </div>
-                            <div class="form-group">
-                                <label>Wachtwoord</label>
-                                <input type="password" id="auth-password" required placeholder="${isLogin ? "" : "Minimaal 4 tekens"}">
-                            </div>
-                            <button type="submit" class="auth-submit-btn">
-                                ${isLogin ? "Inloggen 🎅" : "Account Aanmaken 🎁"}
-                            </button>
-                        </form>
-                    </div>
+        const isLoginStep = this.authStep === "login";
+        return `
+            <div class="container guided-auth-page">
+                <button type="button" class="back-link" id="auth-back">← Terug</button>
+                <p class="invitation-kicker">Stap 1 van 2 · Account</p>
+                <h1>${isLoginStep ? "Welkom terug!" : "Maak je account aan"}</h1>
+                <p class="invitation-intro">${isLoginStep ? "Vul je gebruikersnaam en wachtwoord in om verder te gaan." : "Kies een gebruikersnaam die je herkent en bedenk een wachtwoord. Bewaar je wachtwoord goed."}</p>
+                <div class="auth-form-container guided-auth-form">
+                    <form id="auth-form">
+                        <div class="form-group">
+                            <label for="auth-username">Gebruikersnaam</label>
+                            <input type="text" id="auth-username" required autocomplete="username" placeholder="Bijvoorbeeld: Sam" ${isLoginStep ? "" : "minlength=\"2\" maxlength=\"24\""}>
+                            ${isLoginStep ? "" : '<small class="field-help">Zo herkennen anderen jou bij het lootjes trekken.</small>'}
+                        </div>
+                        <div class="form-group">
+                            <label for="auth-password">Wachtwoord</label>
+                            <input type="password" id="auth-password" required autocomplete="${isLoginStep ? "current-password" : "new-password"}" placeholder="${isLoginStep ? "Je wachtwoord" : "Minimaal 4 tekens"}" ${isLoginStep ? "" : "minlength=\"4\""}>
+                            ${isLoginStep ? "" : '<small class="field-help">Gebruik minimaal 4 tekens. Je hebt dit straks nodig om opnieuw in te loggen.</small>'}
+                        </div>
+                        <div id="auth-error" class="error-message auth-error" role="alert">${this.authError}</div>
+                        <button type="submit" class="auth-submit-btn">${isLoginStep ? "Inloggen en verdergaan 🎅" : "Account maken en verdergaan 🎁"}</button>
+                    </form>
                 </div>
-                
-                <div class="footer-credits">
-                    Gemaakt door <a href="https://semhekman.nl" target="_blank">Sem Hekman</a> 💻
+                <p class="step-note">Daarna vul je je verlanglijstje en hobby's in. Dat helpt degene die jou trekt om een leuk cadeau te kiezen.</p>
+                <div class="footer-credits">Gemaakt door <a href="https://semhekman.nl" target="_blank" rel="noopener">Sem Hekman</a> 💻</div>
+            </div>
+        `;
+    }
+
+    renderOnboardingPage() {
+        if (this.onboarding === "finished") {
+            return `
+                <div class="container guided-auth-page onboarding-page">
+                    <p class="invitation-kicker">Stap 3 van 3 · Klaar om mee te doen</p>
+                    <div class="invitation-icon" aria-hidden="true">🎅</div>
+                    <h1>Je bent helemaal klaar!</h1>
+                    <p class="invitation-intro">Je account en verlanglijstje zijn opgeslagen. Je kunt nu meedoen met het lootjes trekken.</p>
+                    <div class="draw-reminder gift-expectation" role="note">
+                        <strong>Even handig om te weten:</strong>
+                        <p>We maken <span class="geen-accent">geen</span> surprise. We doen een gedichtje, een cadeautje en eventueel iets geks of grappigs.</p>
+                    </div>
+                    <div class="draw-reminder" role="note">
+                        <strong>Belangrijk als je straks een lootje trekt:</strong>
+                        <p>Kijk naar de naam die staat bij <strong>‘Mijn Getrokken Lootje’</strong>. De naam die je op het rad ziet terwijl het draait, kan verkeerd zijn. Alleen de naam bij ‘Mijn Getrokken Lootje’ is de juiste.</p>
+                    </div>
+                    <button type="button" id="onboarding-finish">Begrepen, naar de lootjes 🎁</button>
                 </div>
+            `;
+        }
+
+        return `
+            <div class="container guided-auth-page onboarding-page">
+                <p class="invitation-kicker">Stap 2 van 2 · Jouw profiel</p>
+                <h1>Leuk je te ontmoeten, ${this.currentUser.username}!</h1>
+                <p class="invitation-intro">Vul hieronder wat ideeën in. Je kunt later altijd terugkomen om je lijstje aan te passen.</p>
+                <div class="auth-form-container guided-auth-form">
+                    <form id="onboarding-form">
+                        <div class="form-group">
+                            <label for="onboarding-wishlist">Wat wil je graag krijgen?</label>
+                            <textarea id="onboarding-wishlist" required placeholder="Zet elke wens op een nieuwe regel. Bijvoorbeeld:\nEen boek\nEen spelletje\nChocolade">${this.currentUser.wishlist || ""}</textarea>
+                            <small class="field-help">Een paar ideeën zijn al genoeg. Zo kan jouw lootjegever iets uitkiezen dat bij jou past.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="onboarding-hobbies">Wat vind je leuk om te doen?</label>
+                            <textarea id="onboarding-hobbies" required placeholder="Bijvoorbeeld:\nLezen\nVoetballen\nTekenen">${this.currentUser.hobbies || ""}</textarea>
+                            <small class="field-help">Noem hobby's of interesses. Dit geeft extra inspiratie voor een cadeau.</small>
+                        </div>
+                        <div id="onboarding-error" class="error-message auth-error" role="alert"></div>
+                        <button type="submit">Verlanglijstje opslaan en klaar zijn 🎁</button>
+                    </form>
+                </div>
+                <p class="step-note">Je verlanglijstje is zichtbaar voor de andere deelnemers, zodat zij een passend cadeau kunnen bedenken.</p>
             </div>
         `;
     }
@@ -619,42 +685,86 @@ class App {
         }
 
         if (!this.currentUser) {
-            const isLogin = !window.location.hash.includes("register");
-            app.innerHTML = this.renderAuthPage(isLogin);
+            app.innerHTML = this.renderAuthPage();
 
-            document
-                .getElementById("auth-form")
-                .addEventListener("submit", (e) => {
+            const loginChoice = document.getElementById("choose-login");
+            const registerChoice = document.getElementById("choose-register");
+            if (loginChoice) {
+                loginChoice.addEventListener("click", () => {
+                    this.authStep = "login";
+                    this.authError = "";
+                    this.render();
+                });
+            }
+            if (registerChoice) {
+                registerChoice.addEventListener("click", () => {
+                    this.authStep = "register";
+                    this.authError = "";
+                    this.render();
+                });
+            }
+
+            const backButton = document.getElementById("auth-back");
+            if (backButton) {
+                backButton.addEventListener("click", () => {
+                    this.authStep = "welcome";
+                    this.authError = "";
+                    this.render();
+                });
+            }
+
+            const authForm = document.getElementById("auth-form");
+            if (authForm) {
+                authForm.addEventListener("submit", (e) => {
                     e.preventDefault();
-                    const username =
-                        document.getElementById("auth-username").value;
-                    const password =
-                        document.getElementById("auth-password").value;
+                    const username = document.getElementById("auth-username").value.trim();
+                    const password = document.getElementById("auth-password").value;
 
-                    const currentTab =
-                        document.querySelector(".auth-tab.active");
-                    const isLoginTab = currentTab.id === "tab-login";
-
-                    if (isLoginTab) {
+                    if (this.authStep === "login") {
                         this.login(username, password);
                     } else {
                         this.register(username, password);
                     }
                 });
+            }
+        } else if (this.onboarding) {
+            app.innerHTML = this.renderOnboardingPage();
+            const onboardingForm = document.getElementById("onboarding-form");
+            if (onboardingForm) {
+                onboardingForm.addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    const wishlist = document.getElementById("onboarding-wishlist").value.trim();
+                    const hobbies = document.getElementById("onboarding-hobbies").value.trim();
+                    const errorElement = document.getElementById("onboarding-error");
 
-            document
-                .getElementById("tab-login")
-                .addEventListener("click", () => {
-                    window.location.hash = "";
+                    try {
+                        const response = await fetch("/api/profile", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ wishlist, hobbies }),
+                        });
+                        const data = await response.json();
+                        if (!response.ok) {
+                            errorElement.textContent = data.error || "Opslaan is niet gelukt. Probeer het opnieuw.";
+                            return;
+                        }
+
+                        this.currentUser = data;
+                        this.onboarding = "finished";
+                        this.render();
+                    } catch (error) {
+                        errorElement.textContent = "Opslaan is niet gelukt: " + error.message;
+                    }
+                });
+            }
+            const finishOnboardingButton = document.getElementById("onboarding-finish");
+            if (finishOnboardingButton) {
+                finishOnboardingButton.addEventListener("click", () => {
+                    this.onboarding = false;
+                    this.currentTab = "wheel";
                     this.render();
                 });
-
-            document
-                .getElementById("tab-register")
-                .addEventListener("click", () => {
-                    window.location.hash = "register";
-                    this.render();
-                });
+            }
         } else {
             app.innerHTML = await this.renderHomePage();
 
