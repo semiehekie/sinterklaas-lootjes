@@ -1,117 +1,209 @@
+require("dotenv").config();
+
 const express = require("express");
 const session = require("express-session");
 const bcrypt = require("bcrypt");
 const path = require("path");
-const fs = require("fs").promises;
+const { Pool } = require("pg");
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
+const DATABASE_URL = process.env.DATABASE_URL;
 
-// CONFIGURATIE
+if (!DATABASE_URL) {
+    console.error("DATABASE_URL ontbreekt. Voeg een .env-file toe met je Neon-connection string.");
+    process.exit(1);
+}
+
+const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: DATABASE_URL.includes("neon.tech") ? { rejectUnauthorized: false } : false,
+});
+
 const CONFIG = {
-    drawingDate: "2025-11-07T00:00:00",
+    drawingDate: "2026-10-05T00:00:00",
     minParticipants: 2,
     allowMultipleDraws: false,
 };
 
-// Data directory
-const DATA_DIR = path.join(__dirname, "..", "data");
-const USERS_FILE = path.join(DATA_DIR, "users.json");
-const DRAWS_FILE = path.join(DATA_DIR, "draws.json");
-
-// In-memory database
 let users = [];
 let draws = {};
+let revealedDraws = new Set();
 
-// Ensure data directory exists
-async function ensureDataDir() {
-    try {
-        await fs.mkdir(DATA_DIR, { recursive: true });
-    } catch (error) {
-        console.error("Error creating data directory:", error);
+async function createDatabaseSchema() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password TEXT NOT NULL,
+            wishlist TEXT DEFAULT '',
+            hobbies TEXT DEFAULT ''
+        );
+    `);
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS draws (
+            drawer_username TEXT PRIMARY KEY,
+            drawn_username TEXT NOT NULL,
+            revealed_at TIMESTAMPTZ,
+            already_drawn BOOLEAN NOT NULL DEFAULT FALSE
+        );
+    `);
+
+    await pool.query(
+        "ALTER TABLE draws ADD COLUMN IF NOT EXISTS revealed_at TIMESTAMPTZ",
+    );
+    await pool.query(
+        "ALTER TABLE draws ADD COLUMN IF NOT EXISTS already_drawn BOOLEAN NOT NULL DEFAULT FALSE",
+    );
+
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS app_metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+    `);
+
+    const migration = await pool.query(
+        "SELECT 1 FROM app_metadata WHERE key = 'draw_revealed_state_migrated'",
+    );
+    if (migration.rowCount === 0) {
+        await pool.query(
+            "UPDATE draws SET already_drawn = TRUE, revealed_at = COALESCE(revealed_at, NOW())",
+        );
+        await pool.query(
+            "INSERT INTO app_metadata (key, value) VALUES ('draw_revealed_state_migrated', 'true')",
+        );
     }
 }
 
-// Load users
 async function loadUsers() {
-    try {
-        const data = await fs.readFile(USERS_FILE, "utf8");
-        users = JSON.parse(data);
-    } catch (error) {
-        if (error.code !== "ENOENT") console.error("Error loading users:", error);
-        users = [];
-    }
+    const result = await pool.query(
+        "SELECT username, password, wishlist, hobbies FROM users ORDER BY username",
+    );
+    users = result.rows.map((row) => ({
+        username: row.username,
+        password: row.password,
+        wishlist: row.wishlist || "",
+        hobbies: row.hobbies || "",
+    }));
 }
 
-// Save users
-async function saveUsers() {
-    try {
-        await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2));
-    } catch (error) {
-        console.error("Error saving users:", error);
-    }
-}
-
-// Load draws (plain JSON)
 async function loadDraws() {
-    try {
-        const data = await fs.readFile(DRAWS_FILE, "utf8");
-        draws = JSON.parse(data);
-    } catch (error) {
-        if (error.code !== "ENOENT") console.error("Error loading draws:", error);
-        draws = {};
-    }
-}
-
-// Save draws (plain JSON)
-async function saveDraws() {
-    try {
-        await fs.writeFile(DRAWS_FILE, JSON.stringify(draws, null, 2));
-    } catch (error) {
-        console.error("Error saving draws:", error);
-    }
-}
-
-// Initialize
-async function initializeData() {
-    await ensureDataDir();
-    await loadUsers();
-    await loadDraws();
-    console.log(
-        `Geladen: ${users.length} gebruikers en ${Object.keys(draws).length} trekkingen`,
+    const result = await pool.query(
+        "SELECT drawer_username, drawn_username, already_drawn FROM draws",
+    );
+    draws = Object.fromEntries(
+        result.rows.map((row) => [row.drawer_username, row.drawn_username]),
+    );
+    revealedDraws = new Set(
+        result.rows
+            .filter((row) => row.already_drawn)
+            .map((row) => row.drawer_username),
     );
 }
 
-// Middleware
+async function initializeData() {
+    try {
+        await pool.query("SELECT 1");
+        await createDatabaseSchema();
+        await loadUsers();
+        await loadDraws();
+        console.log(
+            `Verbonden met PostgreSQL/Neon: ${users.length} gebruikers en ${Object.keys(draws).length} trekkingen geladen.`,
+        );
+    } catch (error) {
+        console.error("Kan geen verbinding maken met Neon/PostgreSQL:", error.message);
+        process.exit(1);
+    }
+}
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "..")));
 app.use("/css", express.static(path.join(__dirname, "..", "css")));
 app.use("/js", express.static(path.join(__dirname, "..", "js")));
 app.use(
     session({
-        secret: "veldhuizen-secret-2025",
+        secret: process.env.SESSION_SECRET || "veldhuizen-secret-2025",
         resave: false,
         saveUninitialized: false,
         cookie: { secure: false },
     }),
 );
 
-// Check if drawing allowed
 function isDrawingAllowed() {
     const now = new Date();
     const drawDate = new Date(CONFIG.drawingDate);
     return now >= drawDate && users.length >= CONFIG.minParticipants;
 }
 
-// Get all participants except those already drawn
-function getAvailableParticipants(currentUser) {
-    const alreadyDrawn = Object.values(draws);
-    return users
-        .filter((u) => u.username !== currentUser)
-        .filter((u) => !alreadyDrawn.includes(u.username));
+function shuffle(items) {
+    const shuffled = [...items];
+
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+        const randomIndex = Math.floor(Math.random() * (index + 1));
+        [shuffled[index], shuffled[randomIndex]] = [
+            shuffled[randomIndex],
+            shuffled[index],
+        ];
+    }
+
+    return shuffled;
 }
 
-// API routes
+function findAssignments(drawers, recipients, assignments = {}) {
+    if (drawers.length === 0) return assignments;
+
+    const orderedDrawers = [...drawers].sort((first, second) => {
+        const firstOptions = recipients.filter((recipient) => recipient !== first).length;
+        const secondOptions = recipients.filter((recipient) => recipient !== second).length;
+        return firstOptions - secondOptions;
+    });
+    const drawer = orderedDrawers[0];
+    const remainingDrawers = orderedDrawers.slice(1);
+
+    for (const recipient of shuffle(recipients.filter((name) => name !== drawer))) {
+        const remainingRecipients = recipients.filter((name) => name !== recipient);
+        const result = findAssignments(
+            remainingDrawers,
+            remainingRecipients,
+            { ...assignments, [drawer]: recipient },
+        );
+
+        if (result) return result;
+    }
+
+    return null;
+}
+
+async function ensureDrawAssignments() {
+    const assignedDrawers = new Set(Object.keys(draws));
+    const assignedRecipients = new Set(Object.values(draws));
+    const remainingDrawers = users
+        .map((user) => user.username)
+        .filter((username) => !assignedDrawers.has(username));
+    const remainingRecipients = users
+        .map((user) => user.username)
+        .filter((username) => !assignedRecipients.has(username));
+
+    if (remainingDrawers.length === 0) return;
+
+    const assignments = findAssignments(remainingDrawers, remainingRecipients);
+    if (!assignments) {
+        throw new Error("Er kan geen geldige verdeling van de lootjes worden gemaakt.");
+    }
+
+    for (const [drawer, recipient] of Object.entries(assignments)) {
+        await pool.query(
+            `INSERT INTO draws (drawer_username, drawn_username, already_drawn)
+             VALUES ($1, $2, FALSE)
+             ON CONFLICT (drawer_username) DO NOTHING`,
+            [drawer, recipient],
+        );
+    }
+
+    await loadDraws();
+}
+
 app.post("/api/register", async (req, res) => {
     const { username, password } = req.body;
 
@@ -119,20 +211,28 @@ app.post("/api/register", async (req, res) => {
         return res.status(400).json({ error: "Gebruikersnaam en wachtwoord zijn verplicht" });
     }
 
-    if (users.find((u) => u.username === username)) {
+    const existingUser = await pool.query("SELECT 1 FROM users WHERE username = $1", [username]);
+    if (existingUser.rowCount > 0) {
         return res.status(400).json({ error: "Gebruikersnaam bestaat al" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    users.push({ username, password: hashedPassword, wishlist: "", hobbies: "" });
+    await pool.query(
+        "INSERT INTO users (username, password, wishlist, hobbies) VALUES ($1, $2, '', '')",
+        [username, hashedPassword],
+    );
+    await loadUsers();
 
-    await saveUsers();
     res.json({ success: true });
 });
 
 app.post("/api/login", async (req, res) => {
     const { username, password } = req.body;
-    const user = users.find((u) => u.username === username);
+    const result = await pool.query(
+        "SELECT username, password, wishlist, hobbies FROM users WHERE username = $1",
+        [username],
+    );
+    const user = result.rows[0];
 
     if (!user) {
         return res.status(401).json({ error: "Ongeldige inloggegevens" });
@@ -156,12 +256,17 @@ app.post("/api/logout", (req, res) => {
     res.json({ success: true });
 });
 
-app.get("/api/me", (req, res) => {
+app.get("/api/me", async (req, res) => {
     if (!req.session.username) {
         return res.status(401).json({ error: "Niet ingelogd" });
     }
 
-    const user = users.find((u) => u.username === req.session.username);
+    const result = await pool.query(
+        "SELECT username, wishlist, hobbies FROM users WHERE username = $1",
+        [req.session.username],
+    );
+    const user = result.rows[0];
+
     if (!user) return res.status(401).json({ error: "Gebruiker niet gevonden" });
 
     res.json({
@@ -171,17 +276,22 @@ app.get("/api/me", (req, res) => {
     });
 });
 
-app.get("/api/participants", (req, res) => {
+app.get("/api/participants", async (req, res) => {
     if (!req.session.username) {
         return res.status(401).json({ error: "Niet ingelogd" });
     }
 
-    const participants = users.map((u) => ({
-        username: u.username,
-        wishlist: u.wishlist || "",
-        hobbies: u.hobbies || "",
-    }));
-    res.json(participants);
+    const result = await pool.query(
+        "SELECT username, wishlist, hobbies FROM users ORDER BY username",
+    );
+
+    res.json(
+        result.rows.map((user) => ({
+            username: user.username,
+            wishlist: user.wishlist || "",
+            hobbies: user.hobbies || "",
+        })),
+    );
 });
 
 app.post("/api/profile", async (req, res) => {
@@ -190,29 +300,39 @@ app.post("/api/profile", async (req, res) => {
     }
 
     const { wishlist, hobbies } = req.body;
-    const user = users.find((u) => u.username === req.session.username);
+    const result = await pool.query(
+        "UPDATE users SET wishlist = $1, hobbies = $2 WHERE username = $3 RETURNING username, wishlist, hobbies",
+        [wishlist || "", hobbies || "", req.session.username],
+    );
+
+    const user = result.rows[0];
     if (!user) return res.status(404).json({ error: "Gebruiker niet gevonden" });
 
-    user.wishlist = wishlist || "";
-    user.hobbies = hobbies || "";
-
-    await saveUsers();
+    await loadUsers();
     res.json({ username: user.username, wishlist: user.wishlist, hobbies: user.hobbies });
 });
 
-app.get("/api/my-draw", (req, res) => {
+app.get("/api/my-draw", async (req, res) => {
     if (!req.session.username) {
         return res.status(401).json({ error: "Niet ingelogd" });
     }
 
-    const drawnPerson = draws[req.session.username];
-    if (!drawnPerson) return res.json({ drawn: null });
+    const result = await pool.query(
+        `SELECT d.drawn_username, u.wishlist, u.hobbies
+         FROM draws d
+         LEFT JOIN users u ON u.username = d.drawn_username
+         WHERE d.drawer_username = $1 AND d.already_drawn = TRUE`,
+        [req.session.username],
+    );
 
-    const drawnUser = users.find((u) => u.username === drawnPerson);
+    const draw = result.rows[0];
+    if (!draw) return res.json({ drawn: null, revealed: false });
+
     res.json({
-        drawn: drawnPerson,
-        wishlist: drawnUser?.wishlist || "",
-        hobbies: drawnUser?.hobbies || "",
+        drawn: draw.drawn_username,
+        wishlist: draw.wishlist || "",
+        hobbies: draw.hobbies || "",
+        revealed: revealedDraws.has(req.session.username),
     });
 });
 
@@ -220,6 +340,9 @@ app.post("/api/draw", async (req, res) => {
     if (!req.session.username) {
         return res.status(401).json({ error: "Niet ingelogd" });
     }
+
+    await loadUsers();
+    await loadDraws();
 
     if (!isDrawingAllowed()) {
         const drawDate = new Date(CONFIG.drawingDate);
@@ -233,29 +356,41 @@ app.post("/api/draw", async (req, res) => {
     }
 
     const currentUser = req.session.username;
+    const user = users.find((candidate) => candidate.username === currentUser);
 
-    if (!CONFIG.allowMultipleDraws && draws[currentUser]) {
-        return res.status(400).json({ error: "Je hebt al een lootje getrokken!" });
+    if (!user || !user.wishlist.trim() || !user.hobbies.trim()) {
+        return res.status(400).json({
+            error: "Vul eerst je verlanglijstje en hobby's in bij Mijn Profiel.",
+        });
     }
 
-    const available = getAvailableParticipants(currentUser);
-    if (available.length === 0) {
-        return res.status(400).json({ error: "Er zijn geen beschikbare personen meer om te trekken!" });
+    if (revealedDraws.has(currentUser)) {
+        return res.status(400).json({ error: "Je hebt je lootje al getrokken!" });
     }
 
-    const randomIndex = Math.floor(Math.random() * available.length);
-    const drawn = available[randomIndex].username;
+    try {
+        await ensureDrawAssignments();
+    } catch (error) {
+        return res.status(400).json({ error: error.message });
+    }
 
-    draws[currentUser] = drawn;
-    await saveDraws();
+    const drawn = draws[currentUser];
+    if (!drawn) {
+        return res.status(400).json({ error: "Er kon geen lootje voor deze gebruiker worden gevonden." });
+    }
+
+    await pool.query(
+        "UPDATE draws SET already_drawn = TRUE, revealed_at = NOW() WHERE drawer_username = $1 AND already_drawn = FALSE",
+        [currentUser],
+    );
+    revealedDraws.add(currentUser);
 
     res.json({ drawn });
 });
 
-// Admin
-app.get("/api/admin/users", (req, res) => {
-    const userList = users.map((u) => ({ username: u.username }));
-    res.json(userList);
+app.get("/api/admin/users", async (req, res) => {
+    const result = await pool.query("SELECT username FROM users ORDER BY username");
+    res.json(result.rows.map((row) => ({ username: row.username })));
 });
 
 app.post("/api/admin/delete-user", async (req, res) => {
@@ -263,18 +398,17 @@ app.post("/api/admin/delete-user", async (req, res) => {
 
     if (!username) return res.status(400).json({ error: "Gebruikersnaam is verplicht" });
 
-    const userIndex = users.findIndex((u) => u.username === username);
-    if (userIndex === -1) return res.status(404).json({ error: "Gebruiker niet gevonden" });
-
-    users.splice(userIndex, 1);
-
-    if (draws[username]) delete draws[username];
-    for (const [drawer, drawn] of Object.entries(draws)) {
-        if (drawn === username) delete draws[drawer];
+    const userCheck = await pool.query("SELECT 1 FROM users WHERE username = $1", [username]);
+    if (userCheck.rowCount === 0) {
+        return res.status(404).json({ error: "Gebruiker niet gevonden" });
     }
 
-    await saveUsers();
-    await saveDraws();
+    await pool.query("DELETE FROM users WHERE username = $1", [username]);
+    await pool.query("DELETE FROM draws WHERE drawer_username = $1", [username]);
+    await pool.query("DELETE FROM draws WHERE drawn_username = $1", [username]);
+    await loadUsers();
+    await loadDraws();
+
     res.json({ success: true });
 });
 
