@@ -2,7 +2,7 @@ class App {
     constructor() {
         this.currentUser = null;
         this.participants = [];
-        this.currentTab = "wheel";
+        this.currentTab = "draw";
         this.authStep = "welcome";
         this.authError = "";
         this.onboarding = false;
@@ -115,10 +115,9 @@ class App {
         modal.innerHTML = hasProfile
             ? `
                 <div class="draw-modal" role="dialog" aria-modal="true" aria-labelledby="draw-modal-title">
-                    <h2 id="draw-modal-title">Even opletten</h2>
-                    <p>De naam die tijdens het draaien op het rad staat, is niet altijd de naam die je echt hebt getrokken.</p>
-                    <p>Kijk na het draaien bij <strong>Mijn Getrokken Lootje</strong> voor het juiste resultaat.</p>
-                    <button type="button" class="draw-modal-ok">OK, draai het rad</button>
+                    <h2 id="draw-modal-title">Klaar om te trekken?</h2>
+                    <p>Een paardje brengt je lootje. Daarna verschijnt de naam groot op het scherm.</p>
+                    <button type="button" class="draw-modal-ok">Ja, trek mijn lootje! 🎁</button>
                 </div>
             `
             : `
@@ -145,56 +144,98 @@ class App {
         if (okButton) {
             okButton.addEventListener("click", () => {
                 closeModal();
-                this.spinWheel();
+                this.drawLoot();
             });
         }
     }
 
-    async spinWheel() {
+    async drawLoot() {
+        const button = document.getElementById("draw-btn");
+        const track = document.getElementById("horse-track");
+        const prompt = document.getElementById("draw-prompt");
+        const result = document.getElementById("result");
+        button.disabled = true;
+        result.replaceChildren();
+
+        let audioContext = null;
+        try {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioContextClass) {
+                audioContext = new AudioContextClass();
+                await audioContext.resume();
+            }
+        } catch (error) {
+            audioContext = null;
+        }
+
         try {
             const response = await fetch("/api/draw", { method: "POST" });
             const data = await response.json();
 
             if (!response.ok) {
-                document.getElementById("result").innerHTML =
-                    `<div class="error-message">${data.error}</div>`;
+                result.textContent = data.code
+                    ? `Foutcode ${data.code}: ${data.error || "Het lootje kon niet worden getrokken."}`
+                    : data.error || "Het lootje kon niet worden getrokken.";
+                result.className = "error-message";
+                button.disabled = false;
+                if (audioContext) audioContext.close();
                 return;
             }
 
-            const wheel = document.querySelector("#wheel svg");
-            const randomSpins = 5 + Math.random() * 3;
-            const wheelParticipants = this.participants.filter(
-                (p) => p.username !== this.currentUser.username,
-            );
-            const targetIndex = wheelParticipants.findIndex(
-                (p) => p.username === data.drawn,
-            );
+            track.classList.add("is-running");
+            prompt.textContent = "Het paardje brengt je lootje…";
+            await new Promise((resolve) => setTimeout(resolve, 1900));
 
-            if (targetIndex === -1) {
-                document.getElementById("result").innerHTML =
-                    `<div class="error-message">${data.drawn} staat niet op het rad. Vernieuw de pagina en probeer opnieuw.</div>`;
-                return;
-            }
+            track.classList.remove("is-running");
+            track.classList.add("is-arrived");
+            prompt.textContent = "Hoera, je hebt getrokken!";
 
-            const degreesPerSegment = 360 / wheelParticipants.length;
-            const targetCenter = (targetIndex + 0.5) * degreesPerSegment;
-            const totalRotation = randomSpins * 360 - targetCenter;
-
-            if (wheel) {
-                wheel.style.transformOrigin = "50% 50%";
-                wheel.style.transform = `rotate(${totalRotation}deg)`;
-            }
-
-            setTimeout(() => {
-                document.getElementById("result").innerHTML =
-                    `<div class="result-message success">
-                         Je hebt <strong>${data.drawn}</strong> getrokken! 🎁
-                    </div>`;
-                document.getElementById("spin-btn").disabled = true;
-            }, 4000);
+            const reveal = document.createElement("div");
+            reveal.className = "draw-reveal";
+            reveal.setAttribute("role", "status");
+            const caption = document.createElement("span");
+            caption.className = "draw-reveal-caption";
+            caption.textContent = "Jij verrast dit jaar…";
+            const name = document.createElement("strong");
+            name.className = "draw-reveal-name";
+            name.textContent = data.drawn;
+            const gift = document.createElement("span");
+            gift.className = "draw-reveal-gift";
+            gift.textContent = "🎁";
+            reveal.append(caption, name, gift);
+            result.className = "draw-result";
+            result.replaceChildren(reveal);
+            this.playDrawSound(audioContext);
         } catch (error) {
-            document.getElementById("result").innerHTML =
-                `<div class="error-message">Er ging iets mis: ${error.message}</div>`;
+            result.textContent = `Er ging iets mis: ${error.message}`;
+            result.className = "error-message";
+            button.disabled = false;
+            if (audioContext) audioContext.close();
+        }
+    }
+
+    playDrawSound(audioContext) {
+        if (!audioContext) return;
+
+        try {
+            const now = audioContext.currentTime;
+            [659.25, 830.61, 987.77].forEach((frequency, index) => {
+                const startTime = now + index * 0.13;
+                const oscillator = audioContext.createOscillator();
+                const volume = audioContext.createGain();
+                oscillator.type = "sine";
+                oscillator.frequency.value = frequency;
+                volume.gain.setValueAtTime(0.0001, startTime);
+                volume.gain.exponentialRampToValueAtTime(0.16, startTime + 0.025);
+                volume.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.38);
+                oscillator.connect(volume);
+                volume.connect(audioContext.destination);
+                oscillator.start(startTime);
+                oscillator.stop(startTime + 0.4);
+            });
+            setTimeout(() => audioContext.close(), 900);
+        } catch (error) {
+            audioContext.close();
         }
     }
 
@@ -209,6 +250,10 @@ class App {
                     <div class="draw-reminder gift-expectation" role="note">
                         <strong>Wat doen we met Sinterklaas?</strong>
                         <p>We maken <span class="geen-accent">geen</span> surprise. Het gaat om een gedichtje, een cadeautje en eventueel iets geks of grappigs.</p>
+                    </div>
+                    <div class="draw-reminder event-details" role="note">
+                        <strong>🎉 Sinterklaasavond · vrijdag 4 december 2026 vanaf 17.30 uur</strong>
+                        <p>Eerst eten, daarna het dobbelspel. Budget: €3 voor een gekkigheidje en €15 voor het cadeautje.</p>
                     </div>
                     <div class="invitation-choices">
                         <button type="button" class="invitation-choice" id="choose-login">
@@ -232,6 +277,12 @@ class App {
                 <p class="invitation-kicker">Stap 1 van 2 · Account</p>
                 <h1>${isLoginStep ? "Welkom terug!" : "Maak je account aan"}</h1>
                 <p class="invitation-intro">${isLoginStep ? "Vul je gebruikersnaam en wachtwoord in om verder te gaan." : "Kies een gebruikersnaam die je herkent en bedenk een wachtwoord. Bewaar je wachtwoord goed."}</p>
+                ${isLoginStep ? "" : `
+                    <div class="draw-reminder event-details" role="note">
+                        <strong>🎉 Vrijdag 4 december 2026 vanaf 17.30 uur</strong>
+                        <p>Eerst eten, daarna het dobbelspel. Budget: €3 voor een gekkigheidje en €15 voor het cadeautje.</p>
+                    </div>
+                `}
                 <div class="auth-form-container guided-auth-form">
                     <form id="auth-form">
                         <div class="form-group">
@@ -261,16 +312,16 @@ class App {
                     <p class="invitation-kicker">Stap 3 van 3 · Klaar om mee te doen</p>
                     <div class="invitation-icon" aria-hidden="true">🎅</div>
                     <h1>Je bent helemaal klaar!</h1>
-                    <p class="invitation-intro">Je account en verlanglijstje zijn opgeslagen. Je kunt nu meedoen met het lootjes trekken.</p>
-                    <div class="draw-reminder gift-expectation" role="note">
-                        <strong>Even handig om te weten:</strong>
-                        <p>We maken <span class="geen-accent">geen</span> surprise. We doen een gedichtje, een cadeautje en eventueel iets geks of grappigs.</p>
+                    <p class="invitation-intro">Je account en verlanglijstje zijn opgeslagen. Vanaf 6 november 2026 kun je een lootje trekken.</p>
+                    <div class="draw-reminder event-details" role="note">
+                        <strong>🎉 Vrijdag 4 december 2026 vanaf 17.30 uur</strong>
+                        <p>Eerst eten, daarna het dobbelspel. Budget: €3 voor een gekkigheidje en €15 voor het cadeautje.</p>
                     </div>
                     <div class="draw-reminder" role="note">
                         <strong>Belangrijk als je straks een lootje trekt:</strong>
-                        <p>Kijk naar de naam die staat bij <strong>‘Mijn Getrokken Lootje’</strong>. De naam die je op het rad ziet terwijl het draait, kan verkeerd zijn. Alleen de naam bij ‘Mijn Getrokken Lootje’ is de juiste.</p>
+                        <p>Je lootje trekken kan vanaf <strong>6 november 2026</strong>. Daarna brengt een paardje je lootje en verschijnt de getrokken naam groot op het scherm.</p>
                     </div>
-                    <button type="button" id="onboarding-finish">Begrepen, naar de lootjes 🎁</button>
+                    <button type="button" id="onboarding-finish">Begrepen, lootjes trekken vanaf 6 november 🎁</button>
                 </div>
             `;
         }
@@ -409,96 +460,26 @@ class App {
 
     async renderHomePage() {
         await this.loadParticipants();
+        let drawOpens = true;
+        let drawDateMessage = "Druk op de knop en ontdek wie jij gaat verrassen!";
 
-        const colors = [
-            "#FF6B6B",
-            "#4ECDC4",
-            "#FFE66D",
-            "#95E1D3",
-            "#F38181",
-            "#AA96DA",
-            "#FCBAD3",
-            "#A8E6CF",
-        ];
-
-        let segments = "";
-
-        // Filter out current user from wheel participants
-        const wheelParticipants = this.participants.filter(
-            (p) => p.username !== this.currentUser.username,
-        );
-
-        if (wheelParticipants.length > 0) {
-            const numSegments = wheelParticipants.length;
-            const anglePerSegment = 360 / numSegments;
-
-            // Create SVG segments
-            let svgPaths = "";
-            for (let i = 0; i < numSegments; i++) {
-                const startAngle = i * anglePerSegment;
-                const endAngle = (i + 1) * anglePerSegment;
-                const color = colors[i % colors.length];
-
-                // Convert angles to radians
-                const startRad = ((startAngle - 90) * Math.PI) / 180;
-                const endRad = ((endAngle - 90) * Math.PI) / 180;
-
-                // Calculate path points (radius = 150)
-                const x1 = 150 + 150 * Math.cos(startRad);
-                const y1 = 150 + 150 * Math.sin(startRad);
-                const x2 = 150 + 150 * Math.cos(endRad);
-                const y2 = 150 + 150 * Math.sin(endRad);
-
-                const largeArc = anglePerSegment > 180 ? 1 : 0;
-
-                svgPaths += `
-                    <path d="M 150,150 L ${x1},${y1} A 150,150 0 ${largeArc},1 ${x2},${y2} Z" 
-                          fill="${color}" 
-                          stroke="white" 
-                          stroke-width="3"/>
-                `;
+        try {
+            const configResponse = await fetch("/api/draw-config");
+            if (configResponse.ok) {
+                const { drawingDate } = await configResponse.json();
+                const drawDate = new Date(drawingDate);
+                drawOpens = Date.now() >= drawDate.getTime();
+                drawDateMessage = drawOpens
+                    ? "Druk op de knop en ontdek wie jij gaat verrassen!"
+                    : `Lootjes trekken kan vanaf ${new Intl.DateTimeFormat("nl-NL", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                          timeZone: "Europe/Amsterdam",
+                      }).format(drawDate)}.`;
             }
-
-            // Create labels
-            let labels = "";
-            for (let i = 0; i < numSegments; i++) {
-                const angle = i * anglePerSegment + anglePerSegment / 2;
-                const angleRad = ((angle - 90) * Math.PI) / 180;
-                const radius = 85; // Moved closer to center
-                const x = 150 + radius * Math.cos(angleRad);
-                const y = 150 + radius * Math.sin(angleRad);
-
-                // Truncate long names
-                const username = wheelParticipants[i].username;
-                const displayName =
-                    username.length > 10
-                        ? username.substring(0, 8) + ".."
-                        : username;
-
-                labels += `
-                    <text x="${x}" y="${y}" 
-                          text-anchor="middle" 
-                          dominant-baseline="middle"
-                          fill="white" 
-                          font-weight="bold" 
-                          font-size="13"
-                          style="text-shadow: 2px 2px 4px rgba(0,0,0,0.8); pointer-events: none;">
-                        ${displayName}
-                    </text>
-                `;
-            }
-
-            segments = `
-                <svg width="300" height="300" viewBox="0 0 300 300" style="transform: rotate(0deg); transform-origin: 50% 50%; transition: transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99);">
-                    ${svgPaths}
-                    ${labels}
-                    <circle cx="150" cy="150" r="20" fill="#333" stroke="white" stroke-width="4"/>
-                    <circle cx="150" cy="150" r="12" fill="white"/>
-                </svg>
-            `;
-        } else {
-            segments =
-                '<div style="text-align: center; padding: 50px;">Geen deelnemers gevonden</div>';
+        } catch (error) {
+            console.error("Kan de lootjestrekdatum niet ophalen:", error);
         }
 
         // Check if user has filled in wishlist
@@ -520,12 +501,17 @@ class App {
             <div class="container">
                 <h1>🎅 Sinterklaas Lootjes Trekken 🎁</h1>
                 <div class="user-welcome">Welkom, ${this.currentUser.username}! 👞</div>
+
+                <div class="draw-reminder event-details" role="note">
+                    <strong>🎉 Vrijdag 4 december 2026 vanaf 17.30 uur</strong>
+                    <p>Eerst eten, daarna het dobbelspel. Budget: €3 voor een gekkigheidje en €15 voor het cadeautje.</p>
+                </div>
                 
                 ${wishlistReminder}
                 
                 <div class="nav-tabs">
-                    <button class="nav-tab ${this.currentTab === "wheel" ? "active" : ""}" data-tab="wheel">
-                        🎡 Lootjes Trekken
+                    <button class="nav-tab ${this.currentTab === "draw" ? "active" : ""}" data-tab="draw">
+                        🎁 Lootjes Trekken
                     </button>
                     <button class="nav-tab ${this.currentTab === "mydraw" ? "active" : ""}" data-tab="mydraw">
                         🎁 Mijn Getrokken Lootje
@@ -538,24 +524,18 @@ class App {
                     </button>
                 </div>
 
-                <div class="tab-content ${this.currentTab === "wheel" ? "active" : ""}" id="wheel-tab">
-                    <h2>Deelnemers aan het lootjes trekken:</h2>
-                    <div class="wheel-container">
-                        <div class="wheel-wrapper">
-                            <div class="wheel-arrow"></div>
-                            <div id="wheel">
-                                ${segments}
-                            </div>
+                <div class="tab-content ${this.currentTab === "draw" ? "active" : ""}" id="draw-tab">
+                    <h2>Trek jouw lootje!</h2>
+                    <div class="draw-stage">
+                        <div class="horse-track" id="horse-track" aria-hidden="true">
+                            <span class="horse-team">
+                                <span class="draw-horse">🐎</span>
+                                <span class="draw-parcel">🎁</span>
+                            </span>
                         </div>
-                        <div class="info-text">
-                            🎅 Trek je lootje en ontdek wie je gaat verrassen! 🎁
-                        </div>
-                        <div class="wheel-notice">
-                            ℹ️ Let op: Het rad kan soms een verkeerde naam tonen tijdens het draaien.<br>
-                            De <strong>juiste naam</strong> verschijnt altijd hieronder na het trekken! ⬇️
-                        </div>
-                        <button id="spin-btn">Trek een lootje! 🎅</button>
-                        <div id="result"></div>
+                        <p class="draw-prompt" id="draw-prompt" aria-live="polite">${drawDateMessage}</p>
+                        <div id="result" aria-live="polite"></div>
+                        <button id="draw-btn" ${drawOpens ? "" : "disabled"}>${drawOpens ? "Trek een lootje! 🎅" : "Vanaf 6 november 2026 🎁"}</button>
                     </div>
                 </div>
 
@@ -655,16 +635,6 @@ class App {
     switchTab(tabName) {
         this.currentTab = tabName;
         this.render();
-
-        // Reset wheel rotation when switching to wheel tab
-        if (tabName === "wheel") {
-            setTimeout(() => {
-                const wheel = document.querySelector("#wheel svg");
-                if (wheel && !wheel.style.transform.includes("rotate")) {
-                    wheel.style.transform = "rotate(0deg)";
-                }
-            }, 50);
-        }
     }
 
     async render() {
@@ -761,7 +731,7 @@ class App {
             if (finishOnboardingButton) {
                 finishOnboardingButton.addEventListener("click", () => {
                     this.onboarding = false;
-                    this.currentTab = "wheel";
+                    this.currentTab = "draw";
                     this.render();
                 });
             }
@@ -782,9 +752,9 @@ class App {
                 });
             }
 
-            const spinBtn = document.getElementById("spin-btn");
-            if (spinBtn) {
-                spinBtn.addEventListener("click", () => {
+            const drawButton = document.getElementById("draw-btn");
+            if (drawButton) {
+                drawButton.addEventListener("click", () => {
                     this.showDrawModal();
                 });
             }

@@ -21,7 +21,7 @@ const pool = new Pool({
 });
 
 const CONFIG = {
-    drawingDate: "2026-10-05T00:00:00",
+    drawingDate: "2026-11-06T00:00:00+01:00",
     minParticipants: 2,
     allowMultipleDraws: false,
 };
@@ -136,6 +136,10 @@ function isDrawingAllowed() {
     return now >= drawDate && users.length >= CONFIG.minParticipants;
 }
 
+app.get("/api/draw-config", (req, res) => {
+    res.json({ drawingDate: CONFIG.drawingDate });
+});
+
 function shuffle(items) {
     const shuffled = [...items];
 
@@ -175,22 +179,61 @@ function findAssignments(drawers, recipients, assignments = {}) {
     return null;
 }
 
+function validateDrawAssignments(assignments, usernames, requireComplete = false) {
+    const participants = new Set(usernames);
+    const recipients = new Set();
+
+    for (const [drawer, recipient] of Object.entries(assignments)) {
+        if (!participants.has(drawer) || !participants.has(recipient)) {
+            const error = new Error("De trekking bevat een onbekende deelnemer.");
+            error.code = "DRAW_ASSIGNMENTS_INVALID";
+            throw error;
+        }
+
+        if (drawer === recipient) {
+            const error = new Error("Er is een fout ontdekt: je zou jezelf trekken. Er is geen lootje onthuld; neem contact op met de beheerder.");
+            error.code = "DRAW_SELF_ASSIGNMENT";
+            throw error;
+        }
+
+        if (recipients.has(recipient)) {
+            const error = new Error("De trekking bevat een dubbele ontvanger. Er is geen lootje onthuld; neem contact op met de beheerder.");
+            error.code = "DRAW_ASSIGNMENTS_INVALID";
+            throw error;
+        }
+        recipients.add(recipient);
+    }
+
+    if (requireComplete && (Object.keys(assignments).length !== participants.size || recipients.size !== participants.size)) {
+        const error = new Error("De trekking is niet compleet of klopt niet. Er is geen lootje onthuld; neem contact op met de beheerder.");
+        error.code = "DRAW_ASSIGNMENTS_INVALID";
+        throw error;
+    }
+}
+
 async function ensureDrawAssignments() {
+    const usernames = users.map((user) => user.username);
+    validateDrawAssignments(draws, usernames);
+
     const assignedDrawers = new Set(Object.keys(draws));
     const assignedRecipients = new Set(Object.values(draws));
-    const remainingDrawers = users
-        .map((user) => user.username)
-        .filter((username) => !assignedDrawers.has(username));
-    const remainingRecipients = users
-        .map((user) => user.username)
-        .filter((username) => !assignedRecipients.has(username));
+    const remainingDrawers = usernames.filter((username) => !assignedDrawers.has(username));
+    const remainingRecipients = usernames.filter((username) => !assignedRecipients.has(username));
 
-    if (remainingDrawers.length === 0) return;
+    if (remainingDrawers.length === 0) {
+        validateDrawAssignments(draws, usernames, true);
+        return;
+    }
 
     const assignments = findAssignments(remainingDrawers, remainingRecipients);
     if (!assignments) {
-        throw new Error("Er kan geen geldige verdeling van de lootjes worden gemaakt.");
+        const error = new Error("Er kan geen geldige verdeling van de lootjes worden gemaakt.");
+        error.code = "DRAW_ASSIGNMENTS_INVALID";
+        throw error;
     }
+
+    const completeAssignments = { ...draws, ...assignments };
+    validateDrawAssignments(completeAssignments, usernames, true);
 
     for (const [drawer, recipient] of Object.entries(assignments)) {
         await pool.query(
@@ -202,6 +245,7 @@ async function ensureDrawAssignments() {
     }
 
     await loadDraws();
+    validateDrawAssignments(draws, usernames, true);
 }
 
 app.post("/api/register", async (req, res) => {
@@ -346,12 +390,14 @@ app.post("/api/draw", async (req, res) => {
 
     if (!isDrawingAllowed()) {
         const drawDate = new Date(CONFIG.drawingDate);
+        const formattedDrawDate = new Intl.DateTimeFormat("nl-NL", {
+            day: "numeric",
+            month: "long",
+            year: "numeric",
+            timeZone: "Europe/Amsterdam",
+        }).format(drawDate);
         return res.status(403).json({
-            error: `Lootjes trekken is pas mogelijk vanaf ${drawDate.toLocaleDateString("nl-NL", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-            })}!`,
+            error: `Lootjes trekken is pas mogelijk vanaf ${formattedDrawDate}!`,
         });
     }
 
@@ -371,12 +417,24 @@ app.post("/api/draw", async (req, res) => {
     try {
         await ensureDrawAssignments();
     } catch (error) {
-        return res.status(400).json({ error: error.message });
+        return res.status(400).json({
+            code: error.code || "DRAW_ASSIGNMENTS_INVALID",
+            error: error.message,
+        });
     }
 
     const drawn = draws[currentUser];
     if (!drawn) {
-        return res.status(400).json({ error: "Er kon geen lootje voor deze gebruiker worden gevonden." });
+        return res.status(400).json({
+            code: "DRAW_ASSIGNMENTS_INVALID",
+            error: "Er kon geen lootje voor deze gebruiker worden gevonden.",
+        });
+    }
+    if (drawn === currentUser) {
+        return res.status(500).json({
+            code: "DRAW_SELF_ASSIGNMENT",
+            error: "Er is een fout ontdekt: je zou jezelf trekken. Er is geen lootje onthuld; neem contact op met de beheerder.",
+        });
     }
 
     await pool.query(
