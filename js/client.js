@@ -248,12 +248,16 @@ class App {
                     <h1>Hallo, u bent uitgenodigd voor lootjes trekken!</h1>
                     <p class="invitation-intro">Leuk dat je meedoet. Kies hieronder wat bij jou past. We leggen alles stap voor stap uit.</p>
                     <div class="draw-reminder gift-expectation" role="note">
-                        <strong>Wat doen we met Sinterklaas?</strong>
-                        <p>We maken <span class="geen-accent">geen</span> surprise. Het gaat om een gedichtje, een cadeautje en eventueel iets geks of grappigs.</p>
+                        <strong>🎁 DIT GAAN WE DOEN — VERPLICHT!</strong>
+                        <ul class="event-rules">
+                            <li><strong>Lootje:</strong> koop voor degene die je trekt een cadeau van maximaal €15.</li>
+                            <li><strong>Gedicht:</strong> schrijf er verplicht een gedichtje van 6–8 regels bij.</li>
+                            <li><strong>Dobbelspel:</strong> koop óók een gekkigheidje. Dit moet een algemeen cadeau zijn dat voor iedereen geschikt is, want je weet niet wie het krijgt.</li>
+                        </ul>
                     </div>
                     <div class="draw-reminder event-details" role="note">
-                        <strong>🎉 Sinterklaasavond · vrijdag 4 december 2026 vanaf 17.30 uur</strong>
-                        <p>Eerst eten, daarna het dobbelspel. Budget: €3 voor een gekkigheidje en €15 voor het cadeautje.</p>
+                        <strong>🎉 Lootjes trekken · woensdag 18 november 2026</strong>
+                        <p>Vanaf deze datum kun je online je lootje trekken.</p>
                     </div>
                     <div class="invitation-choices">
                         <button type="button" class="invitation-choice" id="choose-login">
@@ -279,8 +283,12 @@ class App {
                 <p class="invitation-intro">${isLoginStep ? "Vul je gebruikersnaam en wachtwoord in om verder te gaan." : "Kies een gebruikersnaam die je herkent en bedenk een wachtwoord. Bewaar je wachtwoord goed."}</p>
                 ${isLoginStep ? "" : `
                     <div class="draw-reminder event-details" role="note">
-                        <strong>🎉 Vrijdag 4 december 2026 vanaf 17.30 uur</strong>
-                        <p>Eerst eten, daarna het dobbelspel. Budget: €3 voor een gekkigheidje en €15 voor het cadeautje.</p>
+                        <strong>🎉 Lootjes trekken · woensdag 18 november 2026</strong>
+                        <ul class="event-rules">
+                            <li><strong>Lootje:</strong> cadeau van maximaal €15 voor degene die je trekt.</li>
+                            <li><strong>Gedicht:</strong> verplicht, 6–8 regels.</li>
+                            <li><strong>Dobbelspel:</strong> neem óók een gekkigheidje mee. Maak het een algemeen cadeau, want je weet niet wie het krijgt.</li>
+                        </ul>
                     </div>
                 `}
                 <div class="auth-form-container guided-auth-form">
@@ -312,16 +320,20 @@ class App {
                     <p class="invitation-kicker">Stap 3 van 3 · Klaar om mee te doen</p>
                     <div class="invitation-icon" aria-hidden="true">🎅</div>
                     <h1>Je bent helemaal klaar!</h1>
-                    <p class="invitation-intro">Je account en verlanglijstje zijn opgeslagen. Vanaf 6 november 2026 kun je een lootje trekken.</p>
+                    <p class="invitation-intro">Je account en verlanglijstje zijn opgeslagen. Vanaf 18 november 2026 kun je een lootje trekken.</p>
                     <div class="draw-reminder event-details" role="note">
-                        <strong>🎉 Vrijdag 4 december 2026 vanaf 17.30 uur</strong>
-                        <p>Eerst eten, daarna het dobbelspel. Budget: €3 voor een gekkigheidje en €15 voor het cadeautje.</p>
+                        <strong>🎉 Lootjes trekken · woensdag 18 november 2026</strong>
+                        <ul class="event-rules">
+                            <li><strong>Lootje:</strong> koop voor degene die je trekt een cadeau van maximaal €15.</li>
+                            <li><strong>Gedicht:</strong> schrijf er verplicht een gedichtje van 6–8 regels bij.</li>
+                            <li><strong>Dobbelspel:</strong> koop óók een gekkigheidje. Dit moet een algemeen cadeau zijn dat voor iedereen geschikt is, want je weet niet wie het krijgt.</li>
+                        </ul>
                     </div>
                     <div class="draw-reminder" role="note">
                         <strong>Belangrijk als je straks een lootje trekt:</strong>
-                        <p>Je lootje trekken kan vanaf <strong>6 november 2026</strong>. Daarna brengt een paardje je lootje en verschijnt de getrokken naam groot op het scherm.</p>
+                        <p>Je lootje trekken kan vanaf <strong>18 november 2026</strong>. Daarna brengt een paardje je lootje en verschijnt de getrokken naam groot op het scherm.</p>
                     </div>
-                    <button type="button" id="onboarding-finish">Begrepen, lootjes trekken vanaf 6 november 🎁</button>
+                    <button type="button" id="onboarding-finish">Begrepen, lootjes trekken vanaf 18 november 🎁</button>
                 </div>
             `;
         }
@@ -503,8 +515,12 @@ class App {
                 <div class="user-welcome">Welkom, ${this.currentUser.username}! 👞</div>
 
                 <div class="draw-reminder event-details" role="note">
-                    <strong>🎉 Vrijdag 4 december 2026 vanaf 17.30 uur</strong>
-                    <p>Eerst eten, daarna het dobbelspel. Budget: €3 voor een gekkigheidje en €15 voor het cadeautje.</p>
+                    <strong>🎁 DIT GAAN WE DOEN — VERPLICHT! · Lootjes trekken vanaf woensdag 18 november 2026</strong>
+                    <ul class="event-rules">
+                        <li><strong>Lootje:</strong> koop voor degene die je trekt een cadeau van maximaal €15.</li>
+                        <li><strong>Gedicht:</strong> schrijf er verplicht een gedichtje van 6–8 regels bij.</li>
+                        <li><strong>Dobbelspel:</strong> koop óók een gekkigheidje. Dit moet een algemeen cadeau zijn dat voor iedereen geschikt is, want je weet niet wie het krijgt.</li>
+                    </ul>
                 </div>
                 
                 ${wishlistReminder}
@@ -535,7 +551,7 @@ class App {
                         </div>
                         <p class="draw-prompt" id="draw-prompt" aria-live="polite">${drawDateMessage}</p>
                         <div id="result" aria-live="polite"></div>
-                        <button id="draw-btn" ${drawOpens ? "" : "disabled"}>${drawOpens ? "Trek een lootje! 🎅" : "Vanaf 6 november 2026 🎁"}</button>
+                        <button id="draw-btn" ${drawOpens ? "" : "disabled"}>${drawOpens ? "Trek een lootje! 🎅" : "Vanaf 18 november 2026 🎁"}</button>
                     </div>
                 </div>
 

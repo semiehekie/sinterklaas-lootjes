@@ -230,6 +230,8 @@ a, .link-text a, .footer-credits a { color: var(--red-dark); font-weight: 800; }
 .onboarding-page textarea { min-height: 115px; }
 .draw-reminder { max-width: 620px; margin: 0 auto 22px; padding: 20px; border: 2px solid #f0d57c; border-radius: 16px; color: #775b17; background: #fff7db; line-height: 1.6; text-align: left; }
 .draw-reminder > strong { display: block; margin-bottom: 8px; color: var(--red-dark); font-size: 1.1rem; }
+.event-rules { display: grid; gap: 8px; margin: 0; padding-left: 1.5rem; }
+.event-rules li { padding-left: 0.2rem; }
 .geen-accent { color: var(--red-dark); font-weight: 900; }
 .draw-reminder p { margin: 0; }
 .draw-reminder p strong { color: var(--night); }

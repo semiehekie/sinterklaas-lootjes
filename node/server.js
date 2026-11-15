@@ -21,7 +21,7 @@ const pool = new Pool({
 });
 
 const CONFIG = {
-    drawingDate: "2026-11-06T00:00:00+01:00",
+    drawingDate: "2026-11-18T00:00:00+01:00",
     minParticipants: 2,
     allowMultipleDraws: false,
 };
